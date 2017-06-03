@@ -1,0 +1,10 @@
+
+  cl_int error;
+  
+  cl_device_id devices[32];
+  size_t dev_size;
+  error = clGetGLContextInfoKHR(contextProps, CL_DEVICES_FOR_GL_CONTEXT_KHR, 32 * sizeof(cl_device_id), devices, &dev_size);
+  int dev_count = dev_size / sizeof(cl_device_id);
+  context = clCreateContext(contextProps, dev_count, devices, nullptr, nullptr, &error);
+  errchk(error);
+  
