@@ -7,17 +7,16 @@
 /*
   run build.bat
   then run img_main.exe, exit the window, see what platform and device are nvidia
-  run ing_main a b, where a is platform index and b is device index
+  run img_main a b, where a is platform index and b is device index
 */
 
-#include "CL/cl.h"
-#include "CL/cl_gl.h"
+#include <CL/cl.h>
+#include <CL/cl_gl.h>
+#include "GL/glew.h"
+#include "GLFW/glfw3.h"
 
 #include <Windows.h>
 #include <stdlib.h>
-
-#include "GL/glew.h"
-#include "GL/glut.h"
 
 #include <vector>
 #include <stdio.h>
@@ -26,18 +25,11 @@
 #include <cmath>
 
 #include "clerrortext.h"
+#include "clerrorcheck.h"
 #include "raydata.h"
 
-#define IMG_X 1920
-#define IMG_Y 1080
-
-void errchk_impl(cl_int err, int line)
-{
-  if (err != CL_SUCCESS)
-  {
-    printf("%i: %s (%i)\n", line, getCLErrorString(err), err);
-  }
-}
+#define IMG_X 1920/2
+#define IMG_Y 1080/2
 
 void glerrchk_impl(int line)
 {
@@ -56,7 +48,6 @@ void glerrchk_impl(int line)
   }
 }
 
-#define errchk(err) errchk_impl(err, __LINE__)
 #define glerrchk() glerrchk_impl(__LINE__)
 
 void load_file(std::string fname, std::string &out)
@@ -72,13 +63,16 @@ void printprogrambuildinfo(cl_program prog, cl_device_id dev)
   char *elog;
   size_t retsize;
   cl_int error = clGetProgramBuildInfo(prog, dev, CL_PROGRAM_BUILD_LOG, 0, nullptr, &retsize);
-  errchk(error);
+  clerrchk(error);
   elog = new char[retsize + 1];
   error = clGetProgramBuildInfo(prog, dev, CL_PROGRAM_BUILD_LOG, retsize, elog, &retsize);
-  errchk(error);
+  clerrchk(error);
   printf("%s\n", elog);
   delete[] elog;
 }
+
+GLFWwindow *window;
+
 cl_context context;
 cl_command_queue cmdQueue;
 cl_kernel kernel;
@@ -117,10 +111,10 @@ void cl_init(void)
     clGetPlatformInfo(platformIds[i], CL_PLATFORM_NAME, psize, (void *)(pname.data()), nullptr);
     printf("Platform:  %s\n", pname.c_str());
     
-    //clGetPlatformInfo(platformIds[i], CL_PLATFORM_EXTENSIONS, 0, nullptr, &psize);
-    //std::string exts(psize, ' ');
-    //clGetPlatformInfo(platformIds[i], CL_PLATFORM_EXTENSIONS, psize, (void *)(exts.data()), nullptr);
-    //printf("Extension support: %s\n", exts.c_str());
+    clGetPlatformInfo(platformIds[i], CL_PLATFORM_EXTENSIONS, 0, nullptr, &psize);
+    std::string exts(psize, ' ');
+    clGetPlatformInfo(platformIds[i], CL_PLATFORM_EXTENSIONS, psize, (void *)(exts.data()), nullptr);
+    printf("Extension support: %s\n", exts.c_str());
     
     cl_uint deviceIdCount = 0;
     clGetDeviceIDs(platformIds[i], CL_DEVICE_TYPE_ALL, 0, nullptr, &deviceIdCount);
@@ -156,22 +150,22 @@ void cl_init(void)
   };
   cl_int error;
   context = clCreateContext(contextProps, deviceIdMasterList[use_platform].size(), deviceIdMasterList[use_platform].data(), nullptr, nullptr, &error);
-  errchk(error);
+  clerrchk(error);
   
   
   std::string psource;
-  load_file("tracekernel.c", psource);
+  load_file("render_client/tracekernel.c", psource);
   
   char const *src = psource.c_str();
   
   program[0] = clCreateProgramWithSource(context, 1, &src, nullptr, &error);
-  errchk(error);
+  clerrchk(error);
   error = clBuildProgram(program[0], deviceIdMasterList[use_platform].size(), deviceIdMasterList[use_platform].data(), nullptr, nullptr, nullptr);
-  errchk(error);
+  clerrchk(error);
   printprogrambuildinfo(program[0], deviceIdMasterList[use_platform][use_device]);
   kernel = clCreateKernel(program[0], "trace", &error);
   
-  errchk(error);
+  clerrchk(error);
   
 /*
 cl_mem clCreateFromGLTexture(   cl_context context,
@@ -185,7 +179,7 @@ cl_mem clCreateFromGLTexture(   cl_context context,
   //gl_tex = gltexfunc(context, CL_MEM_WRITE_ONLY, GL_TEXTURE_2D, 0, texId, &error);
   gl_tex = clCreateFromGLTexture(context, CL_MEM_WRITE_ONLY, GL_TEXTURE_2D, 0, texId, &error);
   
-  errchk(error);
+  clerrchk(error);
   
   float cammat[4][4] = {
     1, 0, 0, 0,
@@ -196,15 +190,15 @@ cl_mem clCreateFromGLTexture(   cl_context context,
   
   cam_mat = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(float) * 16, cammat, &error);
   
-  errchk(error);
+  clerrchk(error);
   
   error = clSetKernelArg(kernel, 0, sizeof(cl_mem), &gl_tex);
-  errchk(error);
+  clerrchk(error);
   error = clSetKernelArg(kernel, 1, sizeof(cl_mem), &cam_mat);
-  errchk(error);
+  clerrchk(error);
   
   cmdQueue = clCreateCommandQueue(context, deviceIdMasterList[use_platform][use_device], 0, &error);
-  errchk(error);
+  clerrchk(error);
   
 }
 
@@ -264,8 +258,8 @@ void gl_init()
   
   std::string vsrc;
   std::string fsrc;
-  load_file("shader.vs", vsrc);
-  load_file("shader.fs", fsrc);
+  load_file("render_client/shader.vs", vsrc);
+  load_file("render_client/shader.fs", fsrc);
   
   vertpart = glCreateShader(GL_VERTEX_SHADER);
   fragpart = glCreateShader(GL_FRAGMENT_SHADER);
@@ -301,8 +295,11 @@ void gl_init()
   glerrchk();
   
   glUseProgram(shader_prog);
+  glerrchk();
   texunif = glGetUniformLocation(shader_prog, "rayimg");
+  glerrchk();
   glActiveTexture(GL_TEXTURE0);
+  glerrchk();
   glUniform1i(texunif, 0);
   
   glerrchk();
@@ -323,14 +320,14 @@ void cl_update()
     0, 0, 0, 1
   };
   error = clEnqueueWriteBuffer(cmdQueue, cam_mat, false, 0, sizeof(float) * 16, matrix, 0, nullptr, nullptr);
-  errchk(error);
+  clerrchk(error);
   error = clEnqueueAcquireGLObjects(cmdQueue, 1, &gl_tex, 0, nullptr, nullptr);
-  errchk(error);
+  clerrchk(error);
   error = clEnqueueNDRangeKernel(cmdQueue, kernel, 2, offset, gworksize, nullptr, 0, nullptr, nullptr);
-  errchk(error);
+  clerrchk(error);
   clEnqueueReleaseGLObjects(cmdQueue, 1, &gl_tex, 0, nullptr, nullptr);
-  errchk(error);
-  // sync point
+  clerrchk(error);
+  // sync point. is it needed?
   clFinish(cmdQueue);
 }
 
@@ -339,7 +336,7 @@ void gl_update()
   glBindVertexArray(vao);
   glUseProgram(shader_prog);
   glDrawArrays(GL_TRIANGLES, 0, 6);
-  glutSwapBuffers();
+  glfwSwapBuffers(window);
   glFlush();
 }
 
@@ -361,8 +358,7 @@ void gl_free()
   glDeleteVertexArrays(1, &vao);
 }
 
-void init()
-{
+void init() {
   gl_init();
   cl_init();
 }
@@ -379,33 +375,36 @@ void release()
   gl_free();
 }
 
-void KeyPressed(unsigned char c, int x, int y) {
-  switch (c) {
-    case '\x1b':
-      release();
-      exit(0);
-  }
-}
-
-void idle()
-{
-  glutPostRedisplay();
-}
 
 int main(int argc, char *argv[])
 {
-  glutInit(&argc, argv);
-  glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
-  glutInitWindowPosition(0,0);
-  glutInitWindowSize(IMG_X,IMG_Y);
-  glutCreateWindow("raytrace");
-  glutDisplayFunc(update);
-  glutKeyboardFunc(KeyPressed);
-  glutIdleFunc(idle);
-  
+  if (!glfwInit())
+  {
+    printf("glfw failed\n");
+    return 0;
+  }
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  window = glfwCreateWindow(IMG_X, IMG_Y, "rays", nullptr, nullptr);
+  if (!window)
+  {
+    glfwTerminate();
+    printf("glfw failed to create window\n");
+    return 0;
+  }
+
+  glfwMakeContextCurrent(window);
   
   glewExperimental = GL_TRUE;
-  glewInit();
+  GLenum err = glewInit();
+  if (err != GLEW_OK)
+  {
+    printf("glew failed\n");
+    printf("%s\n", glewGetErrorString(err));
+    glfwTerminate();
+    return 0;
+  }
   
   if (argc > 1)
     use_platform = atoi(argv[1]);
@@ -414,7 +413,14 @@ int main(int argc, char *argv[])
   
   init();
   
-  glutMainLoop();
+  while (!glfwWindowShouldClose(window))
+  {
+    update();
+    glfwPollEvents();
+  }
   
+  release();
+  glfwTerminate();
+
   return 0;
 }

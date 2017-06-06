@@ -14,29 +14,34 @@ local opencl_libdir = ''
 -- find opencl
 
 if (amd_root ~= '') then
-  opencl_libdir = amd_root .. '\lib\x86_64'
+  opencl_libdir = amd_root .. '\\lib\\x86_64'
 elseif (intel_root ~= '') then
-  opencl_libdir = intel_root .. '\lib\x64'
+  opencl_libdir = intel_root .. '\\lib\\x64'
 elseif (nv_root ~= '') then
-  opencl_libdir = nv_root .. '\lib\x64'
+  opencl_libdir = nv_root .. '\\lib\\x64'
 else
   print('Could not find an OpenCL sdk.  Renderer client project may not link.');
 end
 
 
 -- link to glfw, glew
-function link_to_gls()
+function link_to_gls(use_core)
   local libdir = 'libs';
+  local raycore_dir_rel = 'lib\\Release'
+  local raycore_dir_deb = 'lib\\Debug'
   
-  filter { 'platforms:windows' }
-    libdirs { libdir .. '/Win32/' }
-    
-  filter { 'platforms:linux' }
-    libdirs { libdir .. '/Unix/' }
-  
+  filter { 'system:windows', 'configurations:debug' }
+    libdirs { libdir .. '\\Win32', raycore_dir_deb }
+  filter { 'system:windows', 'configurations:release' }
+		libdirs { libdir .. '\\Win32', raycore_dir_rel }
+  filter { 'system:linux' }
+    libdirs { libdir .. '\\Unix' }
   filter {}
   
-  links { 'glfw3', 'glew_s' }
+  links { 'glfw3', 'glew32' }
+  if (use_core) then
+    links { 'raycore' }
+  end
   
 end
 
@@ -50,13 +55,15 @@ end
 workspace 'raytracer'
   configurations { 'Debug', 'Release' }
   location 'build'
-
+  startproject 'render_client'
   architecture 'x64'
 
+  
 project 'core'
   kind 'StaticLib'
   language 'C++'
   targetdir 'lib/%{cfg.buildcfg}'
+  targetname 'raycore'
   
   files { core_project .. '**.c', core_project .. '**.h', core_project .. '**.cpp', core_project .. '**.hpp' }
 
@@ -65,7 +72,7 @@ project 'core'
   libdirs { opencl_libdir }
   links { 'opencl' }
   
-  link_to_gls()
+  link_to_gls(false)
 
 project 'host'
   kind 'ConsoleApp'
@@ -77,7 +84,8 @@ project 'host'
   include_dirs()
   includedirs(core_project)
   
-  link_to_gls()
+  link_to_gls(true)
+  links { 'OpenGL32' }
   
 project 'render_client'
   kind 'ConsoleApp'
@@ -92,6 +100,7 @@ project 'render_client'
   libdirs { opencl_libdir }
   links { 'opencl' }
   
-  link_to_gls()
+  link_to_gls(true)
+  links { 'OpenGL32' }
   
   

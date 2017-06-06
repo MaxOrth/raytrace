@@ -4,12 +4,14 @@
 
 // from:
 // http://stackoverflow.com/questions/24326432/convenient-way-to-show-opencl-error-codes
-
-const char *getCLErrorString(cl_int error)
-{
-  switch(error)
+#ifdef __cplusplus
+extern "C" {
+#endif
+  const char *getCLErrorString(cl_int error)
   {
-    // run-time and JIT compiler errors
+    switch (error)
+    {
+      // run-time and JIT compiler errors
     case 0: return "CL_SUCCESS";
     case -1: return "CL_DEVICE_NOT_FOUND";
     case -2: return "CL_DEVICE_NOT_AVAILABLE";
@@ -31,7 +33,7 @@ const char *getCLErrorString(cl_int error)
     case -18: return "CL_DEVICE_PARTITION_FAILED";
     case -19: return "CL_KERNEL_ARG_INFO_NOT_AVAILABLE";
 
-    // compile-time errors
+      // compile-time errors
     case -30: return "CL_INVALID_VALUE";
     case -31: return "CL_INVALID_DEVICE_TYPE";
     case -32: return "CL_INVALID_PLATFORM";
@@ -72,7 +74,7 @@ const char *getCLErrorString(cl_int error)
     case -67: return "CL_INVALID_LINKER_OPTIONS";
     case -68: return "CL_INVALID_DEVICE_PARTITION_COUNT";
 
-    // extension errors
+      // extension errors
     case -1000: return "CL_INVALID_GL_SHAREGROUP_REFERENCE_KHR";
     case -1001: return "CL_PLATFORM_NOT_FOUND_KHR";
     case -1002: return "CL_INVALID_D3D10_DEVICE_KHR";
@@ -80,5 +82,8 @@ const char *getCLErrorString(cl_int error)
     case -1004: return "CL_D3D10_RESOURCE_ALREADY_ACQUIRED_KHR";
     case -1005: return "CL_D3D10_RESOURCE_NOT_ACQUIRED_KHR";
     default: return "Unknown OpenCL error";
+    }
   }
+#ifdef __cplusplus
 }
+#endif

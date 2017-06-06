@@ -1,5 +1,5 @@
 
-#include "raydata.h"
+#include "core/raydata.h"
 
 // #include "raytri.h"
 int intersect_ray_triangle(VEC3 const *a, VEC3 const *b, VEC3 const *c, struct Ray const *r, struct vec2 *uvout, float *tout)

@@ -93,22 +93,22 @@ struct SceneObject
 #ifdef __cplusplus
 #ifndef __OPENCL_VERSION__
 
-VEC3 operator+(VEC3 const &l, VEC3 const &r)
+inline VEC3 operator+(VEC3 const &l, VEC3 const &r)
 {
   return { l.x + r.x, l.y + r.y, l.z + r.z };
 }
 
-VEC3 operator-(VEC3 const &l, VEC3 const &r)
+inline VEC3 operator-(VEC3 const &l, VEC3 const &r)
 {
   return { l.x - r.x, l.y - r.y, l.z - r.z };
 }
 
-VEC3 operator*(VEC3 const &l, float r)
+inline VEC3 operator*(VEC3 const &l, float r)
 {
   return { l.x * r, l.y * r, l.z * r };
 }
 
-VEC3 operator*(float l, VEC3 const &r)
+inline VEC3 operator*(float l, VEC3 const &r)
 {
   return { r.x * l, r.y * l, r.z * l };
 }
