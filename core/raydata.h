@@ -12,12 +12,25 @@ typedef float3 vec3;
 #else
 
 #define VEC3 struct vec3
-  
+
+struct uint3
+{
+  unsigned x;
+  unsigned y;
+  unsigned z;
+  unsigned w;
+#ifdef __cplusplus
+  unsigned &operator[](int i) { return (&x)[i]; };
+  unsigned const &operator[](int i) const { return (&x)[i]; };
+#endif
+};
+
 struct vec3
 {
   float x;
   float y;
   float z;
+  float w; // lol. see OpenCL 6.1.5: Alignment of Types
 #ifdef __cplusplus
   float &operator[](int i) { return (&x)[i]; };
   float const &operator[](int i) const { return (&x)[i]; };

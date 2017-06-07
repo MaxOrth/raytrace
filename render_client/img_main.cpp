@@ -27,6 +27,7 @@
 #include "clerrortext.h"
 #include "clerrorcheck.h"
 #include "raydata.h"
+#include "ObjLoader.h"
 
 #define IMG_X 1920/2
 #define IMG_Y 1080/2
@@ -78,6 +79,8 @@ cl_command_queue cmdQueue;
 cl_kernel kernel;
 cl_mem gl_tex;
 cl_mem cam_mat;
+cl_mem tri_buff;
+cl_mem tri_ind_buff;
 cl_program program[2];
 GLuint texId;
 GLuint vao;
@@ -154,7 +157,7 @@ void cl_init(void)
   
   
   std::string psource;
-  load_file("render_client/tracekernel.c", psource);
+  load_file("render_client/tracekernel.ck", psource);
   
   char const *src = psource.c_str();
   
@@ -189,12 +192,31 @@ cl_mem clCreateFromGLTexture(   cl_context context,
   };
   
   cam_mat = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(float) * 16, cammat, &error);
-  
   clerrchk(error);
   
+  printf("Loading teapot\n");
+  std::vector<vec3> vertices;
+  std::vector<uint3> indices;
+
+  LoadObj(std::ifstream("models/teapot.obj"), vertices, indices);
+
+  tri_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(vec3) * vertices.size(), vertices.data(), &error);
+  clerrchk(error);
+  tri_ind_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(uint3) * indices.size(), indices.data(), &error);
+  clerrchk(error);
+  printf("Teapot loaded\n");
+
+  unsigned tricount = indices.size();
+
   error = clSetKernelArg(kernel, 0, sizeof(cl_mem), &gl_tex);
   clerrchk(error);
-  error = clSetKernelArg(kernel, 1, sizeof(cl_mem), &cam_mat);
+  error = clSetKernelArg(kernel, 1, sizeof(unsigned), &tricount);
+  clerrchk(error);
+  error = clSetKernelArg(kernel, 2, sizeof(cl_mem), &tri_buff);
+  clerrchk(error);
+  error = clSetKernelArg(kernel, 3, sizeof(cl_mem), &tri_ind_buff);
+  clerrchk(error);
+  error = clSetKernelArg(kernel, 4, sizeof(cl_mem), &cam_mat);
   clerrchk(error);
   
   cmdQueue = clCreateCommandQueue(context, deviceIdMasterList[use_platform][use_device], 0, &error);
@@ -316,7 +338,7 @@ void cl_update()
   float matrix[4][4] = {
     1, 0, 0, 0,
     0, 1, 0, 0,
-    0, 0, 1, -cam_z,
+    0, 0, 1, -cam_z * 10,
     0, 0, 0, 1
   };
   error = clEnqueueWriteBuffer(cmdQueue, cam_mat, false, 0, sizeof(float) * 16, matrix, 0, nullptr, nullptr);
@@ -347,6 +369,8 @@ void cl_free()
   clReleaseProgram(program[0]);
   clReleaseMemObject(gl_tex);
   clReleaseMemObject(cam_mat);
+  clReleaseMemObject(tri_buff);
+  clReleaseMemObject(tri_ind_buff);
   clReleaseContext(context);
 }
 
