@@ -1,6 +1,8 @@
 
 #include "ObjLoader.h"
 
+#define log(a) printf("%s\n", a)
+
 void LoadObj(std::istream &file, std::vector<vec3> &verts, std::vector<uint3> &indices)
 {
   std::vector<Tri> model;
@@ -39,7 +41,7 @@ void LoadObj(std::istream &file, std::vector<vec3> &verts, std::vector<uint3> &i
         splitstring(line, ' ', tokens);
         if (tokens.size() < 4)
         {
-          // TODO log("incomplete vertex record, using (0,0,0)\n");
+          log("incomplete vertex record, using (0,0,0)\n");
           vert.x = 0;
           vert.y = 0;
           vert.z = 0;
@@ -61,7 +63,7 @@ void LoadObj(std::istream &file, std::vector<vec3> &verts, std::vector<uint3> &i
         vec3 texcoord;
         if (tokens.size() < 3)
         {
-          // TODO log("incomplete texture coordinate record, using (0,0)");
+          log("incomplete texture coordinate record, using (0,0)");
           texcoord.x = 0;
           texcoord.y = 0;
           texcoord.z = 0;
@@ -89,7 +91,11 @@ void LoadObj(std::istream &file, std::vector<vec3> &verts, std::vector<uint3> &i
         uint3 faceTexIndices;
         if (tokens.size() < 4)
         {
-          // TODO log("incomplete face record, ignoring");
+          log("incomplete face record, ignoring");
+        }
+        else if (tokens.size() > 4)
+        {
+          log("Quads and ngons not supported, ignoring.");
         }
         else
         {
@@ -102,7 +108,7 @@ void LoadObj(std::istream &file, std::vector<vec3> &verts, std::vector<uint3> &i
 
           if (!v1par.size() || v1par[0].empty() || !v2par.size() || v2par[0].empty() || !v3par.size() || v3par[0].empty())
           {
-            // TODO log("face record missing vertex index, skipping");
+            log("face record missing vertex index, skipping");
             continue;
           }
           else

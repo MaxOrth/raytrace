@@ -28,6 +28,7 @@
 #include "clerrorcheck.h"
 #include "raydata.h"
 #include "ObjLoader.h"
+#include "CentroidBVH.h"
 
 #define IMG_X 1920/2
 #define IMG_Y 1080/2
@@ -194,17 +195,23 @@ cl_mem clCreateFromGLTexture(   cl_context context,
   cam_mat = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(float) * 16, cammat, &error);
   clerrchk(error);
   
-  printf("Loading teapot\n");
+  printf("Loading model\n");
   std::vector<vec3> vertices;
   std::vector<uint3> indices;
 
-  LoadObj(std::ifstream("models/teapot.obj"), vertices, indices);
+  LoadObj(std::ifstream("models/bunny.obj"), vertices, indices);
 
-  tri_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(vec3) * vertices.size(), vertices.data(), &error);
+  tri_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(vec3) * vertices.size(), vertices.data(), &error);
   clerrchk(error);
   tri_ind_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(uint3) * indices.size(), indices.data(), &error);
   clerrchk(error);
-  printf("Teapot loaded\n");
+  printf("model loaded\n");
+  printf("creating bvh\n");
+  CentroidBVH bvh;
+  CentroidBVHInit(&bvh);
+  CentroidBVHBuild(&bvh, vertices.data(), vertices.size());
+  printf("bvh created\n");
+
 
   unsigned tricount = indices.size();
 
@@ -338,7 +345,7 @@ void cl_update()
   float matrix[4][4] = {
     1, 0, 0, 0,
     0, 1, 0, 0,
-    0, 0, 1, -cam_z * 10,
+    0, 0, 1, -100,
     0, 0, 0, 1
   };
   error = clEnqueueWriteBuffer(cmdQueue, cam_mat, false, 0, sizeof(float) * 16, matrix, 0, nullptr, nullptr);
@@ -350,7 +357,7 @@ void cl_update()
   clEnqueueReleaseGLObjects(cmdQueue, 1, &gl_tex, 0, nullptr, nullptr);
   clerrchk(error);
   // sync point. is it needed?
-  clFinish(cmdQueue);
+  //clFinish(cmdQueue);
 }
 
 void gl_update()
@@ -359,7 +366,7 @@ void gl_update()
   glUseProgram(shader_prog);
   glDrawArrays(GL_TRIANGLES, 0, 6);
   glfwSwapBuffers(window);
-  glFlush();
+  //glFlush();
 }
 
 void cl_free()

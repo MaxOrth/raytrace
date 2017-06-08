@@ -55,10 +55,17 @@ struct vec2
 
 typedef VEC3 Tri[3];
 
+/*
+  a is "min", b is "max".
+  Using it differently will make the GeomUtil functions break.
+*/
 struct AABB
 {
   VEC3 a;
   VEC3 b;
+#ifdef __cplusplus
+  AABB() : a { 0, 0, 0 }, b { 0, 0, 0 } {};
+#endif
 };
 
 struct Model
@@ -91,6 +98,8 @@ struct SceneObject
 (out).y = (a).z * (b).x - (a).x * (b).z; \
 (out).z = (a).x * (b).y - (a).y * (b).x; \
 } while (0)
+
+#define LENGTH(a) (sqrt((a).x*(a).x + (a).y*(a).y + (a).z*(a).z))
 
 #else
 

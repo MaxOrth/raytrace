@@ -97,12 +97,13 @@ __kernel void trace(
   raytmp.w = 0;
   mult_m_f4(&camera_matrix, &raytmp, &out);
   ray.dir = out.xyz;
+  float3 light_dir = { 0, 0, -1 };
 
   float t;
   float t_near = MAXFLOAT;
   struct vec2 uv;
 
-  __global float3 *vert_buff = (__global Tri *)vertices;
+  __global float3 *vert_buff = (__global float3 *)vertices;
   __global uint3 *ind_buff = (__global uint3 *)indices;
 
   for (unsigned i = 0; i < tricount; ++i)
@@ -111,11 +112,13 @@ __kernel void trace(
     float3 a = vert_buff[tri_ind.x];
     float3 b = vert_buff[tri_ind.y];
     float3 c = vert_buff[tri_ind.z];
+    float3 n = cross(a - b, a - c);
+    float u = fabs((float)(dot(n, ray.dir) * 0.7f));
     if (intersect_ray_triangle(&a, &b, &c, &ray, &uv, &t) && t < t_near)
     {
-      color.x = 1 - uv.u - uv.v;
-      color.y = uv.u;
-      color.z = uv.v;
+      color.x = 0.3f + u;//1 - uv.u - uv.v;
+      color.y = 0.3f + u;//uv.u;
+      color.z = 0.3f + u;//uv.v;
       t_near = t;
     }
   }
