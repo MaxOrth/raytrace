@@ -30,6 +30,14 @@ void GrowAABB(vec3 const *test, AABB *dest)
   dest->b.z = std::max(test->z, dest->b.z);
 }
 
+void GrowAABB(vec3 const *elems, size_t count, AABB *dest)
+{
+  for (size_t i = 0; i < count; ++i)
+  {
+    GrowAABB(elems + i, dest);
+  }
+}
+
 void GrowAABB(Tri const *triangles, size_t tricount, AABB *aabb)
 {
   AABB bb;
@@ -38,6 +46,16 @@ void GrowAABB(Tri const *triangles, size_t tricount, AABB *aabb)
     GrowAABB(&triangles[i][0], &bb);
     GrowAABB(&triangles[i][1], &bb);
     GrowAABB(&triangles[i][2], &bb);
+  }
+}
+
+void GrowAABB(vec3 const *verts, uint3 const *tris, size_t const *which, size_t count, AABB *dest)
+{
+  for (size_t i = 0; i < count; ++i)
+  {
+    GrowAABB(verts + tris[which[i]].x, dest);
+    GrowAABB(verts + tris[which[i]].y, dest);
+    GrowAABB(verts + tris[which[i]].z, dest);
   }
 }
 
@@ -62,4 +80,11 @@ bool TriangleInAABBSimple(Tri const *tri, AABB const *bb)
     PointInAABB(&(*tri)[0], bb) ||
     PointInAABB(&(*tri)[1], bb) ||
     PointInAABB(&(*tri)[2], bb);
+}
+
+void TriFromIndices(vec3 const *verts, uint3 const *is, Tri *dest)
+{
+  (*dest)[0] = verts[is->x];
+  (*dest)[1] = verts[is->y];
+  (*dest)[2] = verts[is->z];
 }

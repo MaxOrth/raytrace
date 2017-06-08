@@ -14,10 +14,10 @@ bvh->nodeList = nullptr;
 namespace
 {
 
-  void CBVHCreateLeaf(CentroidBVH *bvh, Tri *triangles, size_t *set, size_t setsize, CentroidBVHNode *node)
+  void CBVHCreateLeaf(CentroidBVH *bvh, uint3 const *triangles, vec3 const *verts, size_t const *set, size_t setsize, CentroidBVHNode *node)
   {
-    InitAABB(triangles, &node->node.leaf.aabb);
-    GrowAABB(triangles, setsize, &node->node.leaf.aabb);
+    InitAABB(&verts[triangles[set[0]].x], &node->node.leaf.aabb);
+    GrowAABB(verts, triangles, set, setsize, &node->node.leaf.aabb);
     node->node.leaf.count = setsize;
     for (size_t i = 0; i < setsize; ++i)
     {
@@ -25,7 +25,7 @@ namespace
     }
   }
 
-  void CBVHRecurseSet(CentroidBVH *bvh, Tri *triangles, size_t *set, size_t setsize, std::vector<CentroidBVHNode> *nodes, size_t parent, unsigned axis)
+  void CBVHRecurseSet(CentroidBVH *bvh, uint3 const *triangles, vec3 const *verts, size_t const *set, size_t setsize, std::vector<CentroidBVHNode> *nodes, size_t parent, unsigned axis)
   {
     if (setsize <= TRIS_PER_LEAF)
     {
@@ -42,10 +42,10 @@ namespace
 
       for (size_t i = 0; i < setsize; ++i)
       {
-        Tri *t = triangles + set[i];
-        Centroid(t, &tri_c);
+        Tri t{ verts[triangles[i][0]], verts[triangles[i][1]], verts[triangles[i][2]] };
+        Centroid(&t, &tri_c);
         vec3 crossres;
-        CROSS((*t)[0] - (*t)[1], (*t)[0] - (*t)[2], crossres);
+        CROSS(t[0] - t[1], t[0] - t[2], crossres);
         tri_m = LENGTH(crossres) / 2.f;
         centroid = (centroid * total_mass + tri_c * tri_m) * (1.f / (total_mass + tri_m));
         total_mass += tri_m;
@@ -73,12 +73,13 @@ namespace
       std::vector<size_t> list2;
       for (size_t i = 0; i < setsize; ++i)
       {
-        Tri *t = triangles + set[i];
-        if (TriangleInAABBSimple(t, &n1))
+        Tri t;
+        TriFromIndices(verts, triangles + set[i], &t);
+        if (TriangleInAABBSimple(&t, &n1))
         {
           list1.push_back(set[i]);
         }
-        if (TriangleInAABBSimple(t, &n2))
+        if (TriangleInAABBSimple(&t, &n2))
         {
           list2.push_back(set[i]);
         }
@@ -94,7 +95,7 @@ namespace
       if (list1.size() <= TRIS_PER_LEAF)
       {
         node1.type = cbvhLEAF;
-        CBVHCreateLeaf(bvh, triangles, list1.data(), list1.size(), &node1);
+        CBVHCreateLeaf(bvh, triangles, verts, list1.data(), list1.size(), &node1);
         nodes->push_back(node1);
       }
       else
@@ -103,7 +104,7 @@ namespace
         node1.node.inner.aabb = n1;
         (*nodes)[parent].node.inner.children_index[0] = n1i;
         nodes->push_back(node1);
-        CBVHRecurseSet(bvh, triangles, list1.data(), list1.size(), nodes, n1i, axis + 1);
+        CBVHRecurseSet(bvh, triangles, verts, list1.data(), list1.size(), nodes, n1i, axis + 1);
       }
       if (list2.size() <= TRIS_PER_LEAF)
       {
@@ -111,19 +112,19 @@ namespace
         node2.type = cbvhINNER;
         node2.node.inner.aabb = n2;
         nodes->push_back(node2);
-        CBVHRecurseSet(bvh, triangles, list2.data(), list2.size(), nodes, n2i, axis + 1);
+        CBVHRecurseSet(bvh, triangles, verts, list2.data(), list2.size(), nodes, n2i, axis + 1);
       }
       else
       {
         node2.type = cbvhLEAF;
-        CBVHCreateLeaf(bvh, triangles, list2.data(), list2.size(), &node2);
+        CBVHCreateLeaf(bvh, triangles, verts, list2.data(), list2.size(), &node2);
         nodes->push_back(node2);
       }
     }
   }
 }
 
-void CentroidBVHBuild(CentroidBVH *bvh, Tri *triangles, size_t tricount)
+void CentroidBVHBuild(CentroidBVH *bvh, uint3 const *triangles, vec3 const *verts, size_t tricount, size_t vertcount)
 {
   if (tricount == 0)
     return;
@@ -133,12 +134,12 @@ void CentroidBVHBuild(CentroidBVH *bvh, Tri *triangles, size_t tricount)
   // create root node
   CentroidBVHNode root;
   root.type = cbvhINNER;
-  InitAABB(triangles, &root.node.inner.aabb);
-  GrowAABB(triangles, tricount, &root.node.inner.aabb);
+  InitAABB(verts, &root.node.inner.aabb);
+  GrowAABB(verts, vertcount, &root.node.inner.aabb);
   size_t *initialSet = new size_t[tricount];
   for (size_t i = 0; i < tricount; ++i)
   {
     initialSet[i] = i;
   }
-  CBVHRecurseSet(bvh, triangles, initialSet, tricount, &nodeList, 0, 0);
+  CBVHRecurseSet(bvh, triangles, verts, initialSet, tricount, &nodeList, 0, 0);
 }
