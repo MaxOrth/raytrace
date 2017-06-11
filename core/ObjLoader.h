@@ -7,8 +7,6 @@
 
 #include "raydata.h"
 
-#define RAYAPI extern "C"
-
 // TODO move to utilities
 namespace
 {

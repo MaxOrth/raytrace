@@ -209,8 +209,11 @@ cl_mem clCreateFromGLTexture(   cl_context context,
   printf("creating bvh\n");
   CentroidBVH bvh;
   CentroidBVHInit(&bvh);
-  CentroidBVHBuild(&bvh, vertices.data(), vertices.size());
+  CentroidBVHBuild(&bvh, indices.data(), vertices.data(), indices.size(), vertices.size());
   printf("bvh created\n");
+  printf("Triangles: %i\n", bvh.tricount);
+  printf("Max depth: %i\n", bvh.depth);
+  printf("Avg tris per leaf: %f\n", static_cast<float>(bvh.tricount) / bvh.leafcount);
 
 
   unsigned tricount = indices.size();

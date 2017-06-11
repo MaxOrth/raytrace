@@ -2,6 +2,8 @@
   data primitives
 */
 
+#define RAYAPI __stdcall
+
 #pragma once
 
 #ifdef __OPENCL_VERSION__ 

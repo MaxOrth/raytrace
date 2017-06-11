@@ -63,12 +63,16 @@ struct CentroidBVH
   CentroidBVHNode *nodeList;
   size_t listSize;
   size_t listCapacity;
+  int depth;
+  int tricount;
+  int leafcount;
 };
 #ifndef __cplusplus
 typedef struct CentroidBVH CentroidBVH;
 #endif
 
 void CentroidBVHInit(CentroidBVH *bvh);
+void CentroidBVHFree(CentroidBVH *bvh);
 
 // make sure to delete the old one before you build a new one
-void CentroidBVHBuild(CentroidBVH *bvh, Tri *triangles, size_t tricount);
+void CentroidBVHBuild(CentroidBVH *bvh, uint3 const *triangles, vec3 const *verts, size_t tricount, size_t vertcount);

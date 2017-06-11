@@ -1,10 +1,16 @@
 
 #include "ObjLoader.h"
+#include <stdio.h>
 
 #define log(a) printf("%s\n", a)
 
 void LoadObj(std::istream &file, std::vector<vec3> &verts, std::vector<uint3> &indices)
 {
+  if (!file)
+  {
+    printf("stream empty\n");
+  }
+
   std::vector<Tri> model;
 
   std::vector<vec3> vertices;

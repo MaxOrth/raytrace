@@ -7,7 +7,7 @@
   AABB.a will be "min", AABB.b will be "max"
 */
 
-void InitAABB(Tri const *t, AABB *dest)
+void RAYAPI InitAABB(Tri const *t, AABB *dest)
 {
   dest->a.x = std::min(std::min((*t)[0].x, (*t)[1].x), (*t)[2].x);
   dest->a.y = std::min(std::min((*t)[0].y, (*t)[1].y), (*t)[2].y);
@@ -18,8 +18,13 @@ void InitAABB(Tri const *t, AABB *dest)
   dest->b.z = std::max(std::max((*t)[0].z, (*t)[1].z), (*t)[2].z);
 }
 
+void InitAABB(vec3 const *v, AABB *dest)
+{
+  dest->a = *v;
+  dest->b = *v;
+}
 
-void GrowAABB(vec3 const *test, AABB *dest)
+void RAYAPI GrowAABB(vec3 const *test, AABB *dest)
 {
   dest->a.x = std::min(test->x, dest->a.x);
   dest->a.y = std::min(test->y, dest->a.y);
@@ -30,7 +35,7 @@ void GrowAABB(vec3 const *test, AABB *dest)
   dest->b.z = std::max(test->z, dest->b.z);
 }
 
-void GrowAABB(vec3 const *elems, size_t count, AABB *dest)
+void RAYAPI GrowAABB(vec3 const *elems, size_t count, AABB *dest)
 {
   for (size_t i = 0; i < count; ++i)
   {
@@ -66,20 +71,27 @@ void Centroid(Tri const *t, vec3 *c)
   c->z = ((*t)[0].z + (*t)[1].z + (*t)[2].z) / 3.f;
 }
 
-bool PointInAABB(vec3 const *p, AABB const *bb)
+// TODO epsilon
+bool PointInAABB(vec3 const *p, AABB const *bb, float e)
 {
+
   return
-    p->x > bb->a.x && p->x < bb->b.x &&
-    p->y > bb->a.y && p->y < bb->b.y &&
-    p->y > bb->a.z && p->z < bb->b.z;
+    p->x - bb->a.x >= -e && p->x - bb->b.x <= e &&
+    p->y - bb->a.y >= -e && p->y - bb->b.y <= e &&
+    p->y - bb->a.z >= -e && p->z - bb->b.z <= e;
+
+  //return
+  //  p->x >= bb->a.x && p->x <= bb->b.x &&
+  //  p->y >= bb->a.y && p->y <= bb->b.y &&
+  //  p->y >= bb->a.z && p->z <= bb->b.z;
 }
 
-bool TriangleInAABBSimple(Tri const *tri, AABB const *bb)
+bool TriangleInAABBSimple(Tri const *tri, AABB const *bb, float e)
 {
   return
-    PointInAABB(&(*tri)[0], bb) ||
-    PointInAABB(&(*tri)[1], bb) ||
-    PointInAABB(&(*tri)[2], bb);
+    PointInAABB(&(*tri)[0], bb, e) ||
+    PointInAABB(&(*tri)[1], bb, e) ||
+    PointInAABB(&(*tri)[2], bb, e);
 }
 
 void TriFromIndices(vec3 const *verts, uint3 const *is, Tri *dest)
