@@ -26,8 +26,8 @@ namespace
   void CBVHCreateLeaf(CentroidBVH *bvh, uint3 const *triangles, vec3 const *verts, size_t const *set, size_t setsize, CentroidBVHNode *node)
   {
     bvh->leafcount++;
-    InitAABB(&verts[triangles[set[0]].x], &node->node.leaf.aabb);
-    GrowAABB(verts, triangles, set, setsize, &node->node.leaf.aabb);
+    InitAABB(&verts[triangles[set[0]].x], &node->aabb);
+    GrowAABB(verts, triangles, set, setsize, &node->aabb);
     node->node.leaf.count = setsize;
     for (size_t i = 0; i < setsize; ++i)
     {
@@ -126,7 +126,7 @@ namespace
       else
       {
         node1.type = cbvhINNER;
-        node1.node.inner.aabb = n1bb;
+        node1.aabb = n1bb;
         (*nodes)[parent].node.inner.children_index[0] = n1i;
         nodes->push_back(node1);
         CBVHRecurseSet(bvh, triangles, verts, list1.data(), list1.size(), nodes, n1i, axis + 1, depthcounter + 1);
@@ -145,7 +145,7 @@ namespace
       else
       {
         node2.type = cbvhINNER;
-        node2.node.inner.aabb = n2bb;
+        node2.aabb = n2bb;
         nodes->push_back(node2);
         CBVHRecurseSet(bvh, triangles, verts, list2.data(), list2.size(), nodes, n2i, axis + 1, depthcounter + 1);
       }
@@ -165,8 +165,8 @@ void CentroidBVHBuild(CentroidBVH *bvh, uint3 const *triangles, vec3 const *vert
   // create root node
   CentroidBVHNode root;
   root.type = cbvhINNER;
-  InitAABB(verts, &root.node.inner.aabb);
-  GrowAABB(verts, vertcount, &root.node.inner.aabb);
+  InitAABB(verts, &root.aabb);
+  GrowAABB(verts, vertcount, &root.aabb);
   size_t *initialSet = new size_t[tricount];
   for (size_t i = 0; i < tricount; ++i)
   {

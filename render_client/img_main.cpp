@@ -82,6 +82,7 @@ cl_mem gl_tex;
 cl_mem cam_mat;
 cl_mem tri_buff;
 cl_mem tri_ind_buff;
+cl_mem accel_buff;
 cl_program program[2];
 GLuint texId;
 GLuint vao;
@@ -199,7 +200,7 @@ cl_mem clCreateFromGLTexture(   cl_context context,
   std::vector<vec3> vertices;
   std::vector<uint3> indices;
 
-  LoadObj(std::ifstream("models/bunny.obj"), vertices, indices);
+  LoadObj(std::ifstream("models/std_square.obj"), vertices, indices);
 
   tri_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(vec3) * vertices.size(), vertices.data(), &error);
   clerrchk(error);
@@ -215,8 +216,11 @@ cl_mem clCreateFromGLTexture(   cl_context context,
   printf("Max depth: %i\n", bvh.depth);
   printf("Avg tris per leaf: %f\n", static_cast<float>(bvh.tricount) / bvh.leafcount);
 
+  accel_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(CentroidBVHNode) * bvh.listSize, bvh.nodeList, &error);
+  clerrchk(error);
 
   unsigned tricount = indices.size();
+
 
   error = clSetKernelArg(kernel, 0, sizeof(cl_mem), &gl_tex);
   clerrchk(error);
@@ -227,6 +231,8 @@ cl_mem clCreateFromGLTexture(   cl_context context,
   error = clSetKernelArg(kernel, 3, sizeof(cl_mem), &tri_ind_buff);
   clerrchk(error);
   error = clSetKernelArg(kernel, 4, sizeof(cl_mem), &cam_mat);
+  clerrchk(error);
+  error = clSetKernelArg(kernel, 5, sizeof(cl_mem), &accel_buff);
   clerrchk(error);
   
   cmdQueue = clCreateCommandQueue(context, deviceIdMasterList[use_platform][use_device], 0, &error);

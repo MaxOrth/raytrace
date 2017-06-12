@@ -70,6 +70,10 @@ struct AABB
 #endif
 };
 
+#ifndef __cplusplus
+typedef struct AABB AABB;
+#endif
+
 struct Model
 {
   struct AABB vol;

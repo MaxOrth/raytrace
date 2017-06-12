@@ -51,3 +51,29 @@ int intersect_ray_triangle(struct vec3 const *a, struct vec3 const *b, struct ve
   return 0;
   
 }
+
+// https://tavianator.com/fast-branchless-raybounding-box-intersections/
+
+#define min(a,b) ( (a) < (b) ? (a) : (b) )
+#define max(a,b) ( (a) > (b) ? (a) : (b) )
+
+int intersect_ray_aabb(AABB const *aabb, struct Ray const *ray, float *t)
+{
+  struct vec3 dir_inv = { 1 / ray->dir.x, 1 / ray->dir.y, 1 / ray->dir.z };
+  
+  float t1 = (aabb->a.x - ray->origin.x) * dir_inv.x;
+  float t2 = (aabb->b.x - ray->origin.x) * dir_inv.x;
+
+  float tmin = min(t1, t2);
+  float tmax = max(t1, t2);
+
+  for (int i = 1; i < 3; ++i)
+  {
+    t1 = (aabb->a[i] - ray->origin[i]) * dir_inv[i];
+    t2 = (aabb->b[i] - ray->origin[i]) * dir_inv[i];
+    tmin = max(tmin, min(t1, t2));
+    tmax = min(tmax, max(t1, t2));
+  }
+  return tmax > max(tmin, 0);
+}
+
