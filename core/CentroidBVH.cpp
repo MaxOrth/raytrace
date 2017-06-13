@@ -53,7 +53,7 @@ namespace
       vec3 *centroids = new vec3[setsize];
       for (size_t i = 0; i < setsize; ++i)
       {
-        Tri t{ verts[triangles[i][0]], verts[triangles[i][1]], verts[triangles[i][2]] };
+        Tri t{ verts[triangles[i].x], verts[triangles[i].y], verts[triangles[i].z] }; // unaddressable access here. bad obj parser?
         Centroid(&t, &tri_c);
         centroids[i] = tri_c; // TODO calculate centroids and areas all upfront
         vec3 crossres;
@@ -107,11 +107,12 @@ namespace
       AABB n1bb;
       InitAABB(&verts[triangles[list1[0]].x], &n1bb);
       GrowAABB(verts, triangles, list1.data(), list1.size(), &n1bb);
+      MinSizeAABB(&n1bb);
 
       AABB n2bb;
       InitAABB(&verts[triangles[list2[0]].x], &n2bb);
       GrowAABB(verts, triangles, list2.data(), list2.size(), &n2bb);
-
+      MinSizeAABB(&n2bb);
 
       size_t n1i = nodes->size();
       CentroidBVHNode node1;
@@ -167,6 +168,7 @@ void CentroidBVHBuild(CentroidBVH *bvh, uint3 const *triangles, vec3 const *vert
   root.type = cbvhINNER;
   InitAABB(verts, &root.aabb);
   GrowAABB(verts, vertcount, &root.aabb);
+  MinSizeAABB(&root.aabb);
   size_t *initialSet = new size_t[tricount];
   for (size_t i = 0; i < tricount; ++i)
   {
@@ -176,6 +178,6 @@ void CentroidBVHBuild(CentroidBVH *bvh, uint3 const *triangles, vec3 const *vert
   CBVHRecurseSet(bvh, triangles, verts, initialSet, tricount, &nodeList, 0, 0, 0);
   delete[] initialSet;
   bvh->nodeList = new CentroidBVHNode[nodeList.size()];
-  memcpy(bvh->nodeList, nodeList.data(), sizeof(CentroidBVHNode) * nodeList.size());
+  memcpy(bvh->nodeList, nodeList.data(), sizeof(nodeList[0]) * nodeList.size());
   bvh->listSize = nodeList.size();
 }

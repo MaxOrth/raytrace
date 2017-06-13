@@ -29,6 +29,7 @@
 #include "raydata.h"
 #include "ObjLoader.h"
 #include "CentroidBVH.h"
+#include "Affine.h"
 
 #define IMG_X 1920/2
 #define IMG_Y 1080/2
@@ -165,10 +166,14 @@ void cl_init(void)
   
   program[0] = clCreateProgramWithSource(context, 1, &src, nullptr, &error);
   clerrchk(error);
-  error = clBuildProgram(program[0], deviceIdMasterList[use_platform].size(), deviceIdMasterList[use_platform].data(), nullptr, nullptr, nullptr);
+  error = clBuildProgram(program[0], deviceIdMasterList[use_platform].size(), deviceIdMasterList[use_platform].data(), "-Werror", nullptr, nullptr);
   clerrchk(error);
   printprogrambuildinfo(program[0], deviceIdMasterList[use_platform][use_device]);
   kernel = clCreateKernel(program[0], "trace", &error);
+
+  cl_ulong kernel_mem_req;
+  clGetKernelWorkGroupInfo(kernel, deviceIdMasterList[use_platform][use_device], CL_KERNEL_LOCAL_MEM_SIZE, sizeof(cl_ulong), &kernel_mem_req, nullptr);
+  printf("Kernel requires %lld bytes\n", kernel_mem_req);
   
   clerrchk(error);
   
@@ -200,7 +205,7 @@ cl_mem clCreateFromGLTexture(   cl_context context,
   std::vector<vec3> vertices;
   std::vector<uint3> indices;
 
-  LoadObj(std::ifstream("models/std_square.obj"), vertices, indices);
+  LoadObj(std::ifstream("models/wheel.obj"), vertices, indices);
 
   tri_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(vec3) * vertices.size(), vertices.data(), &error);
   clerrchk(error);
@@ -347,26 +352,32 @@ void cl_update()
 {
   timer += 1;
   size_t gworksize[3] = {IMG_X, IMG_Y, 1};
-  size_t lworksize[3] = {1,1,1};
+  size_t lworksize[3] = {8,4,1};
   size_t offset[3] = {0,0,0};
   int error;
-  float cam_z = 1 + std::sin(timer / 100);
-  float matrix[4][4] = {
+  float cam_z = 1 + std::sin(timer / 100.f);
+  float trans[4][4] = {
     1, 0, 0, 0,
     0, 1, 0, 0,
-    0, 0, 1, -5 - cam_z * 4,
+    0, 0, 1, -cam_z,
     0, 0, 0, 1
   };
+  float axis[4]{ 0, 1, 0, 0 };
+  float rot[4][4];
+  float matrix[4][4];
+  rotate3(rot, axis, timer / 50);
+  multiply(rot, trans, matrix);
+
   error = clEnqueueWriteBuffer(cmdQueue, cam_mat, false, 0, sizeof(float) * 16, matrix, 0, nullptr, nullptr);
   clerrchk(error);
   error = clEnqueueAcquireGLObjects(cmdQueue, 1, &gl_tex, 0, nullptr, nullptr);
   clerrchk(error);
-  error = clEnqueueNDRangeKernel(cmdQueue, kernel, 2, nullptr, gworksize, lworksize, 0, nullptr, nullptr);
+  error = clEnqueueNDRangeKernel(cmdQueue, kernel, 2, nullptr, gworksize, nullptr, 0, nullptr, nullptr);
   clerrchk(error);
   clEnqueueReleaseGLObjects(cmdQueue, 1, &gl_tex, 0, nullptr, nullptr);
   clerrchk(error);
   // sync point. is it needed?
-  //clFinish(cmdQueue);
+  clFinish(cmdQueue);
 }
 
 void gl_update()
@@ -375,7 +386,7 @@ void gl_update()
   glUseProgram(shader_prog);
   glDrawArrays(GL_TRIANGLES, 0, 6);
   glfwSwapBuffers(window);
-  //glFlush();
+  glFlush();
 }
 
 void cl_free()
@@ -387,6 +398,7 @@ void cl_free()
   clReleaseMemObject(cam_mat);
   clReleaseMemObject(tri_buff);
   clReleaseMemObject(tri_ind_buff);
+  clReleaseMemObject(accel_buff);
   clReleaseContext(context);
 }
 
@@ -452,11 +464,18 @@ int main(int argc, char *argv[])
     use_device = atoi(argv[2]);
   
   init();
-  
+
+  double time = glfwGetTime();
+
   while (!glfwWindowShouldClose(window))
   {
     update();
     glfwPollEvents();
+    double t = glfwGetTime();
+    char buff[32];
+    sprintf(buff, "fps: %f", 1 / (t - time));
+    time = t;
+    glfwSetWindowTitle(window, buff);
   }
   
   release();

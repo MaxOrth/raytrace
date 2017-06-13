@@ -119,18 +119,18 @@ void LoadObj(std::istream &file, std::vector<vec3> &verts, std::vector<uint3> &i
           }
           else
           {
-            face[0] = static_cast<unsigned>(atoi(v1par[0].c_str()));
-            face[1] = static_cast<unsigned>(atoi(v2par[0].c_str()));
-            face[2] = static_cast<unsigned>(atoi(v3par[0].c_str()));
+            face[0] = static_cast<unsigned>(atoi(v1par[0].c_str())) - 1;
+            face[1] = static_cast<unsigned>(atoi(v2par[0].c_str())) - 1;
+            face[2] = static_cast<unsigned>(atoi(v3par[0].c_str())) - 1;
           }
 
           if (v1par.size() > 1 && v2par.size() > 1 && v3par.size() > 1)
           {
             if (!v1par[1].empty() && !v2par[1].empty() && !v3par[1].empty())
             {
-              faceTexIndices[0] = static_cast<unsigned>(atoi(v1par[1].c_str()));
-              faceTexIndices[1] = static_cast<unsigned>(atoi(v2par[1].c_str()));
-              faceTexIndices[2] = static_cast<unsigned>(atoi(v3par[1].c_str()));
+              faceTexIndices[0] = static_cast<unsigned>(atoi(v1par[1].c_str())) - 1;
+              faceTexIndices[1] = static_cast<unsigned>(atoi(v2par[1].c_str())) - 1;
+              faceTexIndices[2] = static_cast<unsigned>(atoi(v3par[1].c_str())) - 1;
             }
           }
 
@@ -139,9 +139,9 @@ void LoadObj(std::istream &file, std::vector<vec3> &verts, std::vector<uint3> &i
           //{
           //  if (!v1par[2].empty() && !v2par[2].empty() && !v3par[2].empty())
           //  {
-          //    faceTexIndices[0] = static_cast<unsigned>(atol(v1par[1].c_str()));
-          //    faceTexIndices[1] = static_cast<unsigned>(atol(v2par[1].c_str()));
-          //    faceTexIndices[2] = static_cast<unsigned>(atol(v3par[1].c_str()));
+          //    faceTexIndices[0] = static_cast<unsigned>(atol(v1par[1].c_str())) - 1;
+          //    faceTexIndices[1] = static_cast<unsigned>(atol(v2par[1].c_str())) - 1;
+          //    faceTexIndices[2] = static_cast<unsigned>(atol(v3par[1].c_str())) - 1;
           //  }
           //}
           faces.push_back(face);

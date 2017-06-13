@@ -24,6 +24,7 @@ struct uint3
 #ifdef __cplusplus
   unsigned &operator[](int i) { return (&x)[i]; };
   unsigned const &operator[](int i) const { return (&x)[i]; };
+  uint3() : w(0) {};
 #endif
 };
 

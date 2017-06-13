@@ -4,6 +4,12 @@
 
 void RAYAPI InitAABB(Tri const *elem, AABB *dest);
 void RAYAPI InitAABB(vec3 const *p, AABB *dest);
+
+/*
+  Makes sure no dimension in aabb is 0. adds a little bit to dims that are
+*/
+void MinSizeAABB(AABB *dest);
+
 /*
   Grows the aabb as required to keep elem in it.
 */

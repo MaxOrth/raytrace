@@ -24,6 +24,22 @@ void InitAABB(vec3 const *v, AABB *dest)
   dest->b = *v;
 }
 
+void MinSizeAABB(AABB *dest)
+{
+  if (abs(dest->a.x - dest->b.x) < EPSILON)
+  {
+    dest->b.x += EPSILON;
+  }
+  if (abs(dest->a.y - dest->b.y) < EPSILON)
+  {
+    dest->b.y += EPSILON;
+  }
+  if (abs(dest->a.z - dest->b.z) < EPSILON)
+  {
+    dest->b.z += EPSILON;
+  }
+}
+
 void RAYAPI GrowAABB(vec3 const *test, AABB *dest)
 {
   dest->a.x = std::min(test->x, dest->a.x);

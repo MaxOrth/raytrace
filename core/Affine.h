@@ -9,63 +9,6 @@
 #include <cassert>
 
 
-struct Hcoord {
-  float x, y, z, w;
-  explicit Hcoord(float X=0, float Y=0, float Z=0, float W=0);
-  float& operator[](int i) { return *(&x+i); }
-  float operator[](int i) const { return *(&x+i); }
-  static bool Near(float x, float y) { return std::abs(x-y) < 1e-5f; }
-};
-
-
-struct Point : Hcoord {
-  explicit Point(float X=0, float Y=0, float Z=0);
-  Point(const Hcoord& v) : Hcoord(v) {  }
-};
-  
-
-struct Vector : Hcoord {
-  explicit Vector(float X=0, float Y=0, float Z=0);
-  Vector(const Hcoord& v) : Hcoord(v) {  }
-};
-
-typedef float (fmat4x4_t) [4][4];
-
-struct Matrix {
-  Hcoord row[4];
-  Hcoord& operator[](int i) { return row[i]; }
-  const Hcoord& operator[](int i) const { return row[i]; }
-  operator fmat4x4_t *() {
-    return reinterpret_cast<float (*)[4][4]>(&row[0]);
-  };
-};
-
-
-struct Affine : Matrix {
-  Affine(void);
-  Affine(const Vector& Lx, const Vector& Ly, const Vector& Lz, const Point& D);
-  Affine(const Matrix& M) : Matrix(M)                 
-      { assert(Hcoord::Near(M[3][0],0) && Hcoord::Near(M[3][1],0)
-               && Hcoord::Near(M[3][2],0) && Hcoord::Near(M[3][3],1)); }
-};
-
-
-Hcoord operator+(const Hcoord& u, const Hcoord& v);
-Hcoord operator-(const Hcoord& u, const Hcoord& v);
-Hcoord operator-(const Hcoord& v);
-Hcoord operator*(float r, const Hcoord& v);
-Hcoord operator*(const Matrix& A, const Hcoord& v);
-Matrix operator*(const Matrix& A, const Matrix& B);
-float abs(const Vector& v);
-Vector normalize(const Vector& v);
-Vector cross(const Vector& u, const Vector& v);
-Affine Rot(float t, const Vector& v);
-Affine Trans(const Vector& v);
-Affine Scale(float r);
-Affine Scale(float rx, float ry, float rz);
-Affine Inverse(const Affine& A);
-
-
 #define AFFINE_MATELEM_SIGN(i,j) ((i + j) % 2 ? -1 : 1)
 
 
@@ -91,7 +34,16 @@ template <typename T, int W = 0>
 T normalize(T const & u)
 {
   float len = abs<T, W>(u);
-  return static_cast<T>(Hcoord(u.x / len, u.y / len, u.z / len, W * u.w / len));
+  return T{ u.x / len, u.y / len, u.z / len, W * u.w / len };
+}
+
+void inline normalize(float const (&in)[4], float(&out)[4])
+{
+  float len = sqrt(in[0] * in[0] + in[1] * in[1] + in[2] * in[2] + in[3] * in[3]);
+  out[0] = in[0] / len;
+  out[1] = in[1] / len;
+  out[2] = in[2] / len;
+  out[3] = in[3];
 }
 
 template <unsigned Dim>
@@ -208,30 +160,50 @@ void inverse(float const (&in) [Dim][Dim], float (&out)[Dim][Dim])
   
 }
 
-Affine Inverse(Affine const & a)
+void inline rotate3(float (&out)[4][4], float const (&vec)[4], float angle)
 {
-  //float const (&in) [4][4] = *reinterpret_cast<float const(*)[4][4]>(&a);
-  //float (&out) [4][4] = *reinterpret_cast<float(*)[4][4]>(&c);
-  //inverse(in, out);
-  //return c;
+  float cos_a = cos(angle);
+  float sin_a = sin(angle);
+  float v[4];
+  normalize(vec, v);
   
-  Matrix c;
-  float mat3x3[3][3];
-  for (int i = 0; i < 3; ++i)
-    for (int j = 0; j < 3; ++j)
-      mat3x3[i][j] = a[i][j];
-  
-  inverse(mat3x3, mat3x3);
-  
-  for (int i = 0; i < 3; ++i)
-    for (int j = 0; j < 3; ++j)
-      c[i][j] = mat3x3[i][j];
-  
-  c[3][3] = 1;
-  
-  Affine t_inv = Trans(Vector(-a[0][3], -a[1][3], -a[2][3]));
-  
-  return c * t_inv;
+  out[0][0] = cos_a + v[0] * v[0] * (1 - cos_a);
+  out[0][1] = v[0] * v[1] * (1 - cos_a) - v[2] * sin_a;
+  out[0][2] = v[0] * v[2] * (1 - cos_a) + v[1] * sin_a;
+  out[0][3] = 0;
+
+  out[1][0] = v[0] * v[1] * (1 - cos_a) + v[2] * sin_a;
+  out[1][1] = cos_a + v[1] * v[1] * (1 - cos_a);
+  out[1][2] = v[1] * v[2] * (1 - cos_a) - v[0] * sin_a;
+  out[1][0] = 0;
+
+  out[2][0] = v[0] * v[2] * (1 - cos_a) - v[1] * sin_a;
+  out[2][1] = v[1] * v[2] * (1 - cos_a) + v[0] * sin_a;
+  out[2][2] = cos_a + v[2] * v[2] * (1 - cos_a);
+  out[2][3] = 0;
+
+  out[3][0] = 0;
+  out[3][1] = 0;
+  out[3][2] = 0;
+  out[3][3] = 1;
+
+}
+
+template <unsigned Dim1, unsigned Dim2, unsigned Dim3>
+void multiply(float const (&a)[Dim1][Dim2], float const (&b)[Dim3][Dim1], float(&out)[Dim3][Dim2])
+{
+  for (unsigned i = 0; i < Dim2; ++i)
+  {
+    for (unsigned j = 0; j < Dim3; ++j)
+    {
+      float tmp = 0;
+      for (unsigned k = 0; k < Dim1; ++k)
+      {
+        tmp += a[k][i] * b[j][k];
+      }
+      out[i][j] = tmp;
+    }
+  }
 }
 
 #undef AFFINE_MATELEM_SIGN
