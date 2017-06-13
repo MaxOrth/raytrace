@@ -354,14 +354,14 @@ void cl_update()
   float matrix[4][4] = {
     1, 0, 0, 0,
     0, 1, 0, 0,
-    0, 0, 1, -100,
+    0, 0, 1, -5 - cam_z * 4,
     0, 0, 0, 1
   };
   error = clEnqueueWriteBuffer(cmdQueue, cam_mat, false, 0, sizeof(float) * 16, matrix, 0, nullptr, nullptr);
   clerrchk(error);
   error = clEnqueueAcquireGLObjects(cmdQueue, 1, &gl_tex, 0, nullptr, nullptr);
   clerrchk(error);
-  error = clEnqueueNDRangeKernel(cmdQueue, kernel, 2, offset, gworksize, nullptr, 0, nullptr, nullptr);
+  error = clEnqueueNDRangeKernel(cmdQueue, kernel, 2, nullptr, gworksize, lworksize, 0, nullptr, nullptr);
   clerrchk(error);
   clEnqueueReleaseGLObjects(cmdQueue, 1, &gl_tex, 0, nullptr, nullptr);
   clerrchk(error);

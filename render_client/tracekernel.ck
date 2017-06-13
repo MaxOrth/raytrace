@@ -125,112 +125,115 @@ __kernel void trace(
   ray.dir = out.xyz;
   float3 light_dir = { 0, 0, -1 };
 
-  float t;
-  float t_near = MAXFLOAT;
-  struct vec2 uv;
-
   __global float3 *vert_buff = (__global __read_only float3 *)vertices;
   __global uint3 *ind_buff = (__global __read_only uint3 *)indices;
 
   //list of internal nodes with potential intersections
-  __global __read_only CentroidBVHNode * __local nodeStack[80];
-  __global __read_only CentroidBVHNode * __local leafNodeStack[40];
+  __global __read_only CentroidBVHNode * __local nodeStack[8];
+  __global __read_only CentroidBVHNode * __local leafNodeStack[3];
+
   unsigned nodeStackSize = 1; // 1 bc we push root on at beginning
   unsigned leafStackSize = 0;
   
   // push root onto stack
   nodeStack[0] = accel;
 
-  struct AABB bb = accel[0].aabb;
-  if (intersect_ray_aabb(&bb, &ray, &t))
-  {
-    color.x = 1;
-  }
+  //struct AABB bb = accel[2].aabb;
+  //if (intersect_ray_aabb(&bb, &ray, &t))
+  //{
+  //  color.x = 1;
+  //}
 
+  float t;
   // find all leaf node with potential intersections
-  //while (nodeStackSize)
-  //{
-  //  // pop top of stack
-  //  __global __read_only CentroidBVHNode *curr = nodeStack[nodeStackSize - 1];
-  //  nodeStackSize--;
-  //  
-  //  unsigned child1 = curr->node.inner.children_index[0];
-  //  struct AABB bb = accel[child1].aabb;
-  //  if (intersect_ray_aabb(&bb, &ray, &t))
-  //  {
-  //    color.x = 1;
-  //    //if (accel[child1].type == cbvhINNER)
-  //    //{
-  //    //  nodeStack[nodeStackSize] = accel + child1;
-  //    //  nodeStackSize++;
-  //    //}
-  //    //else
-  //    //{
-  //    //  color.z = 1;
-  //    //  //leafNodeStack[leafStackSize] = child1;
-  //    //  //leafStackSize++;
-  //    //}
-  //  }
-  //
-  //  unsigned child2 = curr->node.inner.children_index[0];
-  //  bb = accel[child2].aabb;
-  //  if (intersect_ray_aabb(&bb, &ray, &t))
-  //  {
-  //    color.x = 1;
-  //    //if (accel[child2].type == cbvhINNER)
-  //    //{
-  //    //  nodeStack[nodeStackSize] = accel + child2;
-  //    //  nodeStackSize++;
-  //    //}
-  //    //else
-  //    //{
-  //    //  color.z = 1;
-  //    //  //leafNodeStack[leafStackSize] = child2;
-  //    //  //leafStackSize++;
-  //    //}
-  //  }
-  //}
-
-  //float t_min = 99999999;
-  //float t_tmp;
-  //// intersect ray with leaf node contents
-  //for (unsigned i = 0; i < leafStackSize; ++i)
-  //{
-  //  __global __read_only CentroidBVHNode *curr = leafNodeStack[i];
-  //  for (unsigned j = 0; j < curr->node.leaf.count; ++j)
-  //  {
-  //    uint3 tri_index = curr->node.leaf.tris[j];
-  //    float3 v1 = vertices[indices[tri_index.x]];
-  //    float3 v2 = vertices[indices[tri_index.y]];
-  //    float3 v3 = vertices[indices[tri_index.z]];
-  //    // VEC3 const *a, VEC3 const *b, VEC3 const *c, struct Ray const *r, struct vec2 *uvout, float *tout
-  //    if (intersect_ray_triangle(&v1, &v2, &v3, &ray, &uv, &t_tmp) && t_tmp < t_near)
-  //    {
-  //      color.x = 1 - uv.u - uv.v;
-  //      color.y = uv.u;
-  //      color.z = uv.v;
-  //      t_near = t_tmp;
-  //    }
-  //  }
-  //}
-
-  for (unsigned i = 0; i < tricount; ++i)
+  while (nodeStackSize)
   {
-    uint3 tri_ind = ind_buff[i];
-    float3 a = vert_buff[tri_ind.x];
-    float3 b = vert_buff[tri_ind.y];
-    float3 c = vert_buff[tri_ind.z];
-    float3 n = cross(a - b, a - c);
-    float u = fabs((float)(dot(n, ray.dir) * 0.7f));
-    if (intersect_ray_triangle(&a, &b, &c, &ray, &uv, &t) && t < t_near)
+    // pop top of stack
+    __global __read_only CentroidBVHNode *curr = nodeStack[nodeStackSize - 1];
+    nodeStackSize--;
+    
+    unsigned child1 = curr->node.inner.children_index[0];
+    struct AABB bb = accel[child1].aabb;
+    if (intersect_ray_aabb(&bb, &ray, &t))
     {
-      color.y = 1;
-      //color.x = 0.3f + u;//1 - uv.u - uv.v;
-      //color.y = 0.3f + u;//uv.u;
-      //color.z = 0.3f + u;//uv.v;
-      t_near = t;
+      //color.x = 1;
+      if (accel[child1].type == cbvhINNER)
+      {
+        nodeStack[nodeStackSize] = accel + child1;
+        nodeStackSize++;
+      }
+      else
+      {
+        color.z = 1;
+        leafNodeStack[leafStackSize] = child1;
+        leafStackSize++;
+      }
+    }
+  
+    unsigned child2 = curr->node.inner.children_index[1];
+    bb = accel[child2].aabb;
+    if (intersect_ray_aabb(&bb, &ray, &t))
+    {
+      //color.x = 1;
+      if (accel[child2].type == cbvhINNER)
+      {
+        nodeStack[nodeStackSize] = accel + child2;
+        nodeStackSize++;
+      }
+      else
+      {
+        color.z = 1;
+        leafNodeStack[leafStackSize] = child2;
+        leafStackSize++;
+      }
     }
   }
+
+
+  struct vec2 uv;
+  //float t_min = MAXFLOAT;
+  float t_near = MAXFLOAT;
+  float t_tmp = 0;
+  // intersect ray with leaf node contents
+  for (unsigned i = 0; i < leafStackSize; ++i)
+  {
+    __global __read_only CentroidBVHNode *curr = leafNodeStack[i];
+    for (unsigned j = 0; j < curr->node.leaf.count; ++j)
+    {
+      uint3 tri_index = ind_buff[curr->node.leaf.tris[j]];
+      float3 v1 = vert_buff[tri_index.x];
+      float3 v2 = vert_buff[tri_index.y];
+      float3 v3 = vert_buff[tri_index.z];
+      // VEC3 const *a, VEC3 const *b, VEC3 const *c, struct Ray const *r, struct vec2 *uvout, float *tout
+      //if (intersect_ray_triangle(&v1, &v2, &v3, &ray, &uv, &t_tmp) && t_tmp < t_near)
+      {
+      //  color.x = 1;// -uv.u - uv.v;
+      //  //color.y = uv.u;
+      //  //color.z = uv.v;
+      //  t_min = t_tmp;
+      }
+    }
+  }
+
+  // iterate through all tris (nieve method)
+  //t_near = MAXFLOAT;
+  //for (unsigned i = 0; i < tricount; ++i)
+  //{
+  //  uint3 tri_ind = ind_buff[i];
+  //  float3 a = vert_buff[tri_ind.x];
+  //  float3 b = vert_buff[tri_ind.y];
+  //  float3 c = vert_buff[tri_ind.z];
+  //  float3 n = cross(a - b, a - c);
+  //  //float u = fabs((float)(dot(n, ray.dir) * 0.7f));
+  //  if (intersect_ray_triangle(&a, &b, &c, &ray, &uv, &t) && t < t_near)
+  //  {
+  //    color.y = 1;
+  //    //color.x = 0.3f + u;//1 - uv.u - uv.v;
+  //    //color.y = 0.3f + u;//uv.u;
+  //    //color.z = 0.3f + u;//uv.v;
+  //    t_near = t;
+  //  }
+  //}
 
 
   write_imagef(destimg, pix, color);

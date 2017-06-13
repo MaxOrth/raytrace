@@ -26,8 +26,8 @@ namespace
   void CBVHCreateLeaf(CentroidBVH *bvh, uint3 const *triangles, vec3 const *verts, size_t const *set, size_t setsize, CentroidBVHNode *node)
   {
     bvh->leafcount++;
-    InitAABB(&verts[triangles[set[0]].x], &node->aabb);
-    GrowAABB(verts, triangles, set, setsize, &node->aabb);
+    //InitAABB(&verts[triangles[set[0]].x], &node->aabb);
+    //GrowAABB(verts, triangles, set, setsize, &node->aabb);
     node->node.leaf.count = setsize;
     for (size_t i = 0; i < setsize; ++i)
     {
@@ -106,16 +106,17 @@ namespace
       // calculate bbs of sets
       AABB n1bb;
       InitAABB(&verts[triangles[list1[0]].x], &n1bb);
-      GrowAABB(verts, triangles, list1.data() + 1, list1.size() - 1, &n1bb);
+      GrowAABB(verts, triangles, list1.data(), list1.size(), &n1bb);
 
       AABB n2bb;
       InitAABB(&verts[triangles[list2[0]].x], &n2bb);
-      GrowAABB(verts, triangles, list2.data() + 1, list2.size() - 1, &n2bb);
+      GrowAABB(verts, triangles, list2.data(), list2.size(), &n2bb);
 
 
       size_t n1i = nodes->size();
       CentroidBVHNode node1;
       (*nodes)[parent].node.inner.children_index[0] = n1i;
+      node1.aabb = n1bb;
 
       if (list1.size() <= TRIS_PER_LEAF)
       {
@@ -126,7 +127,6 @@ namespace
       else
       {
         node1.type = cbvhINNER;
-        node1.aabb = n1bb;
         (*nodes)[parent].node.inner.children_index[0] = n1i;
         nodes->push_back(node1);
         CBVHRecurseSet(bvh, triangles, verts, list1.data(), list1.size(), nodes, n1i, axis + 1, depthcounter + 1);
@@ -135,6 +135,7 @@ namespace
       size_t n2i = nodes->size();
       CentroidBVHNode node2;
       (*nodes)[parent].node.inner.children_index[1] = n2i;
+      node2.aabb = n2bb;
 
       if (list2.size() <= TRIS_PER_LEAF)
       {
@@ -145,7 +146,6 @@ namespace
       else
       {
         node2.type = cbvhINNER;
-        node2.aabb = n2bb;
         nodes->push_back(node2);
         CBVHRecurseSet(bvh, triangles, verts, list2.data(), list2.size(), nodes, n2i, axis + 1, depthcounter + 1);
       }
