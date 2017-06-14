@@ -33,6 +33,7 @@ namespace
     {
       node->node.leaf.tris[i] = set[i];
     }
+    printf("leaf bb: %f %f %f, %f %f %f\n", node->aabb.a.x, node->aabb.a.y, node->aabb.a.z, node->aabb.b.x, node->aabb.b.y, node->aabb.b.z);
   }
 
   void CBVHRecurseSet(CentroidBVH *bvh, uint3 const *triangles, vec3 const *verts, size_t const *set, size_t setsize, std::vector<CentroidBVHNode> *nodes, size_t parent, unsigned axis, int depthcounter)

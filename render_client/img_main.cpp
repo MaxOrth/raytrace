@@ -95,6 +95,10 @@ int use_platform = 0;
 int use_device = 0;
 float timer = 0;
 
+float cam_z = -5;
+double cam_r_x = 0;
+double cam_r_y = 0;
+
 typedef cl_mem t_gltexfunc(cl_context,cl_mem_flags,cl_GLenum,cl_GLuint,cl_GLuint,cl_int *);
 
 // cl_init must go after gl_init
@@ -205,7 +209,7 @@ cl_mem clCreateFromGLTexture(   cl_context context,
   std::vector<vec3> vertices;
   std::vector<uint3> indices;
 
-  LoadObj(std::ifstream("models/wheel.obj"), vertices, indices);
+  LoadObj(std::ifstream("models/sphere.obj"), vertices, indices);
 
   tri_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(vec3) * vertices.size(), vertices.data(), &error);
   clerrchk(error);
@@ -355,18 +359,21 @@ void cl_update()
   size_t lworksize[3] = {8,4,1};
   size_t offset[3] = {0,0,0};
   int error;
-  float cam_z = 1 + std::sin(timer / 100.f);
   float trans[4][4] = {
     1, 0, 0, 0,
     0, 1, 0, 0,
-    0, 0, 1, -cam_z,
+    0, 0, 1, cam_z,
     0, 0, 0, 1
   };
-  float axis[4]{ 0, 1, 0, 0 };
-  float rot[4][4];
-  float matrix[4][4];
-  rotate3(rot, axis, timer / 50);
-  multiply(rot, trans, matrix);
+  float axisy[4]{ 0, 1, 0, 0 };
+  float axisx[4]{ 1, 0, 0, 0 };
+  float roty[4][4]{ 0 };
+  float rotx[4][4]{ 0 };
+  float matrix[4][4]{ 0 };
+  rotate3(roty, axisy, cam_r_y / 50);
+  rotate3(rotx, axisx, cam_r_x / 50);
+  multiply(trans, roty, matrix);
+  multiply(matrix, rotx, matrix);
 
   error = clEnqueueWriteBuffer(cmdQueue, cam_mat, false, 0, sizeof(float) * 16, matrix, 0, nullptr, nullptr);
   clerrchk(error);
@@ -471,6 +478,8 @@ int main(int argc, char *argv[])
   {
     update();
     glfwPollEvents();
+    glfwGetCursorPos(window, &cam_r_y, &cam_r_x);
+    
     double t = glfwGetTime();
     char buff[32];
     sprintf(buff, "fps: %f", 1 / (t - time));

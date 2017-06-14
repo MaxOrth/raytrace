@@ -192,6 +192,7 @@ void inline rotate3(float (&out)[4][4], float const (&vec)[4], float angle)
 template <unsigned Dim1, unsigned Dim2, unsigned Dim3>
 void multiply(float const (&a)[Dim1][Dim2], float const (&b)[Dim3][Dim1], float(&out)[Dim3][Dim2])
 {
+  float tmp_m[Dim3][Dim2];
   for (unsigned i = 0; i < Dim2; ++i)
   {
     for (unsigned j = 0; j < Dim3; ++j)
@@ -201,9 +202,10 @@ void multiply(float const (&a)[Dim1][Dim2], float const (&b)[Dim3][Dim1], float(
       {
         tmp += a[k][i] * b[j][k];
       }
-      out[i][j] = tmp;
+      tmp_m[j][i] = tmp;
     }
   }
+  memcpy(out, tmp_m, sizeof(tmp_m));
 }
 
 #undef AFFINE_MATELEM_SIGN

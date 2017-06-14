@@ -133,8 +133,12 @@ __kernel void trace(
   //list of internal nodes with potential intersections
   //__global __read_only CentroidBVHNode * __local nodeStack[8];
   //__global __read_only CentroidBVHNode * __local leafNodeStack[3];
-  CBVH_GPTR __local nodeStack[30];
-  CBVH_GPTR __local leafNodeStack[15];
+
+  // only needs to be as big as deepest branch
+  CBVH_GPTR __local nodeStack[20];
+  // TODO do ray triangle intersection on leaf discovery to get rid of this stack.  
+  // this stack will overflow very easily.
+  CBVH_GPTR __local leafNodeStack[50];
 
   unsigned nodeStackSize = 1; // 1 bc we push root on at beginning
   unsigned leafStackSize = 0;
@@ -149,7 +153,7 @@ __kernel void trace(
   //}
 
   float t;
-  // find all leaf node with potential intersections
+  // find all leaf nodes with potential intersections
   while (nodeStackSize)
   {
     // pop top of stack
@@ -167,7 +171,7 @@ __kernel void trace(
       }
       else
       {
-        color.y = 1;
+        //color.y = 1;
         leafNodeStack[leafStackSize] = accel + child1;
         leafStackSize++;
       }
@@ -184,7 +188,7 @@ __kernel void trace(
       }
       else
       {
-        color.y = 1;
+        //color.y = 1;
         leafNodeStack[leafStackSize] = accel + child2;
         leafStackSize++;
       }
@@ -237,12 +241,12 @@ __kernel void trace(
     float3 b = vert_buff[tri_ind.y];
     float3 c = vert_buff[tri_ind.z];
     float3 n = cross(a - b, a - c);
-    //float u = fabs((float)(dot(n, ray.dir) * 0.7f));
+    float u = fabs((float)(dot(n, ray.dir) * 0.7f));
     if (intersect_ray_triangle(a, b, c, ray, &uv, &t) && t < t_near)
     {
       color.y = 0.1;
-      //color.x = 0.3f + u;//1 - uv.u - uv.v;
-      //color.y = 0.3f + u;//uv.u;
+      color.x = 0.3f + u;//1 - uv.u - uv.v;
+      color.y = 0.3f + u;//uv.u;
       //color.z = 0.3f + u;//uv.v;
       t_near = t;
     }
