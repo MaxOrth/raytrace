@@ -95,7 +95,7 @@ int use_platform = 0;
 int use_device = 0;
 float timer = 0;
 
-float cam_z = -5;
+float cam_z = -3;
 double cam_r_x = 0;
 double cam_r_y = 0;
 
@@ -209,7 +209,7 @@ cl_mem clCreateFromGLTexture(   cl_context context,
   std::vector<vec3> vertices;
   std::vector<uint3> indices;
 
-  LoadObj(std::ifstream("models/sphere.obj"), vertices, indices);
+  LoadObj(std::ifstream("models/tri.obj"), vertices, indices);
 
   tri_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(vec3) * vertices.size(), vertices.data(), &error);
   clerrchk(error);

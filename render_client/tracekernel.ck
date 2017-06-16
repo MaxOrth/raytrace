@@ -172,8 +172,8 @@ __kernel void trace(
       else
       {
         //color.y = 1;
-        leafNodeStack[leafStackSize] = accel + child1;
-        leafStackSize++;
+        //leafNodeStack[leafStackSize] = accel + child1;
+        //leafStackSize++;
       }
     }
   
@@ -189,8 +189,8 @@ __kernel void trace(
       else
       {
         //color.y = 1;
-        leafNodeStack[leafStackSize] = accel + child2;
-        leafStackSize++;
+        //leafNodeStack[leafStackSize] = accel + child2;
+        //leafStackSize++;
       }
     }
   }
@@ -202,35 +202,35 @@ __kernel void trace(
   float t_min = MAXFLOAT;
   float t_tmp = 0;
   // intersect ray with leaf node contents
-  for (unsigned i = 0; i < leafStackSize; ++i)
-  {
-    CBVH_GPTR curr = leafNodeStack[i];
-    //CentroidBVHNode curr = *(leafNodeStack);
-    for (unsigned j = 0; j < curr->node.leaf.count; ++j)
-    {
-      uint3 tri_index = ind_buff[curr->node.leaf.tris[j]];
-      //float3 v1 = vert_buff[tri_index.x];
-      //float3 v2 = vert_buff[tri_index.y];
-      //float3 v3 = vert_buff[tri_index.z];
-      //  VEC3 const *a, VEC3 const *b, VEC3 const *c, struct Ray const *r, struct vec2 *uvout, float *tout
-      if (
-        intersect_ray_triangle(
-          vert_buff[tri_index.x],
-          vert_buff[tri_index.y],
-          vert_buff[tri_index.z],
-          ray,
-          &uv,
-          &t_tmp
-        ) // v1, v2, v3, ray, &uv, &t_tmp) 
-          && t_tmp < t_near)
-      {
-        color.z = 1;// -uv.u - uv.v;
-      //  //color.y = uv.u;
-      //  //color.z = uv.v;
-        t_min = t_tmp;
-      }
-    }
-  }
+  //for (unsigned i = 0; i < leafStackSize; ++i)
+  //{
+  //  CBVH_GPTR curr = leafNodeStack[i];
+  //  //CentroidBVHNode curr = *(leafNodeStack);
+  //  for (unsigned j = 0; j < curr->node.leaf.count; ++j)
+  //  {
+  //    uint3 tri_index = ind_buff[curr->node.leaf.tris[j]];
+  //    //float3 v1 = vert_buff[tri_index.x];
+  //    //float3 v2 = vert_buff[tri_index.y];
+  //    //float3 v3 = vert_buff[tri_index.z];
+  //    //  VEC3 const *a, VEC3 const *b, VEC3 const *c, struct Ray const *r, struct vec2 *uvout, float *tout
+  //    if (
+  //      intersect_ray_triangle(
+  //        vert_buff[tri_index.x],
+  //        vert_buff[tri_index.y],
+  //        vert_buff[tri_index.z],
+  //        ray,
+  //        &uv,
+  //        &t_tmp
+  //      ) // v1, v2, v3, ray, &uv, &t_tmp) 
+  //        && t_tmp < t_near)
+  //    {
+  //      color.z = 1;// -uv.u - uv.v;
+  //    //  //color.y = uv.u;
+  //    //  //color.z = uv.v;
+  //      t_min = t_tmp;
+  //    }
+  //  }
+  //}
 
   //// iterate through all tris (naive method)
   t_near = MAXFLOAT;
@@ -244,7 +244,7 @@ __kernel void trace(
     float u = fabs((float)(dot(n, ray.dir) * 0.7f));
     if (intersect_ray_triangle(a, b, c, ray, &uv, &t) && t < t_near)
     {
-      color.y = 0.1;
+      //color.y = 0.1;
       color.x = 0.3f + u;//1 - uv.u - uv.v;
       color.y = 0.3f + u;//uv.u;
       //color.z = 0.3f + u;//uv.v;

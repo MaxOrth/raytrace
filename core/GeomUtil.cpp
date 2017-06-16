@@ -26,17 +26,17 @@ void InitAABB(vec3 const *v, AABB *dest)
 
 void MinSizeAABB(AABB *dest)
 {
-  if (abs(dest->a.x - dest->b.x) < EPSILON)
+  if (fabs(fabs(dest->a.x) - fabs(dest->b.x)) < 0.01)
   {
-    dest->b.x += EPSILON;
+    dest->b.x += 0.01;
   }
-  if (abs(dest->a.y - dest->b.y) < EPSILON)
+  if (fabs(fabs(dest->a.y) - fabs(dest->b.y)) < 0.01)
   {
-    dest->b.y += EPSILON;
+    dest->b.y += 0.01;
   }
-  if (abs(dest->a.z - dest->b.z) < EPSILON)
+  if (fabs(fabs(dest->a.z) - fabs(dest->b.z)) < 0.01)
   {
-    dest->b.z += EPSILON;
+    dest->b.z += 0.01;
   }
 }
 
