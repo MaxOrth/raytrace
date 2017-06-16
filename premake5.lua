@@ -10,15 +10,19 @@ local nv_root = os.getenv('CUDA_PATH', '')
 local intel_root = os.getenv('INTELOCLSDKROOT', '')
 
 local opencl_libdir = ''
+ 
 
 -- find opencl
 
-if (amd_root ~= '') then
+if (amd_root ~= '' and amd_root ~= nil) then
   opencl_libdir = amd_root .. '\\lib\\x86_64'
-elseif (intel_root ~= '') then
+  print('Found amd sdk at: ' .. amd_root)
+elseif (intel_root ~= '' and intel_root ~= nil) then
   opencl_libdir = intel_root .. '\\lib\\x64'
-elseif (nv_root ~= '') then
+  print('Found intel opencl sdk at: ' .. intel_root)
+elseif (nv_root ~= '' and nv_root ~= nil) then
   opencl_libdir = nv_root .. '\\lib\\x64'
+  print('Found nvidia cuda sdk at: ' .. nv_root)
 else
   print('Could not find an OpenCL sdk.  Renderer client project may not link.');
 end
