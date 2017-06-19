@@ -8,6 +8,8 @@
 #include <cmath>
 #include <cassert>
 
+typedef float fmat4x4[4][4];
+typedef float fmat3x3[3][3];
 
 #define AFFINE_MATELEM_SIGN(i,j) ((i + j) % 2 ? -1 : 1)
 

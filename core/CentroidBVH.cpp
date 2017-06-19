@@ -5,6 +5,9 @@
 #include <vector>
 #include <algorithm>
 
+#include <assert.h>
+#include "ray_tri.h"
+
 void CentroidBVHInit(CentroidBVH *bvh)
 {
   bvh->listSize = 0;
@@ -67,53 +70,87 @@ namespace
       // create two new lists of triangles
       std::vector<size_t> list1;
       std::vector<size_t> list2;
-      for (size_t i = 0; i < setsize; ++i)
+      unsigned axis_count = axis;
+      while (list1.empty() || list2.empty())
       {
-        if (axis % 3 == 0)
+        list1.clear();
+        list2.clear();
+        for (size_t i = 0; i < setsize; ++i)
         {
-          if (centroids[i].x < centroid.x)
+          if (axis_count % 3 == 0)
           {
-            list1.push_back(i);
+            if (centroids[i].x < centroid.x)
+            {
+              list1.push_back(set[i]);
+            }
+            else
+            {
+              list2.push_back(set[i]);
+            }
+          }
+          else if (axis_count % 3 == 1)
+          {
+            if (centroids[i].y < centroid.y)
+            {
+              list1.push_back(set[i]);
+            }
+            else
+            {
+              list2.push_back(set[i]);
+            }
           }
           else
           {
-            list2.push_back(i);
+            if (centroids[i].z < centroid.z)
+            {
+              list1.push_back(set[i]);
+            }
+            else
+            {
+              list2.push_back(set[i]);
+            }
+
           }
+
         }
-        else if (axis % 3 == 1)
-        {
-          if (centroids[i].y < centroid.y)
-          {
-            list1.push_back(i);
-          }
-          else
-          {
-            list2.push_back(i);
-          }
-        }
-        else
-        {
-          if (centroids[i].z < centroid.z)
-          {
-            list1.push_back(i);
-          }
-          else
-          {
-            list2.push_back(i);
-          }
-        }
+        axis_count++;
       }
       delete[] centroids;
       // calculate bbs of sets
+      //printf("child 1\n");
       AABB n1bb;
       InitAABB(&verts[triangles[list1[0]].x], &n1bb);
       GrowAABB(verts, triangles, list1.data(), list1.size(), &n1bb);
       MinSizeAABB(&n1bb);
 
+      for (unsigned i = 0; i < list1.size(); ++i)
+      {
+        if (
+          !PointInAABB(&verts[triangles[list1[i]].x], &n1bb) &&
+          !PointInAABB(&verts[triangles[list1[i]].y], &n1bb) &&
+          !PointInAABB(&verts[triangles[list1[i]].z], &n1bb)
+        )
+        {
+          assert(0);
+        }
+      }
+      //printf("child 2\n");
       AABB n2bb;
       InitAABB(&verts[triangles[list2[0]].x], &n2bb);
       GrowAABB(verts, triangles, list2.data(), list2.size(), &n2bb);
       MinSizeAABB(&n2bb);
+      // second recursion through, index 0: f5 f5 step_into_pointinaabb
+      for (unsigned i = 0; i < list2.size(); ++i)
+      {
+        if (
+          !PointInAABB(&verts[triangles[list2[i]].x], &n2bb) &&
+          !PointInAABB(&verts[triangles[list2[i]].y], &n2bb) &&
+          !PointInAABB(&verts[triangles[list2[i]].z], &n2bb)
+          )
+        {
+          assert(0);
+        }
+      }
 
       size_t n1i = nodes->size();
       CentroidBVHNode node1;
@@ -125,13 +162,17 @@ namespace
         node1.type = cbvhLEAF;
         CBVHCreateLeaf(bvh, triangles, verts, list1.data(), list1.size(), &node1);
         nodes->push_back(node1);
+        //printf("LEAF  node at index %3i with parent %3i", n1i, parent);
+        //printf("  bb: %f %f %f, %f %f %f\n", n1bb.a.x, n1bb.a.y, n1bb.a.z, n1bb.b.x, n1bb.b.y, n1bb.b.z);
       }
       else
       {
         node1.type = cbvhINNER;
         (*nodes)[parent].node.inner.children_index[0] = n1i;
         nodes->push_back(node1);
-        CBVHRecurseSet(bvh, triangles, verts, list1.data(), list1.size(), nodes, n1i, axis + 1, depthcounter + 1);
+        //printf("INNER node at index %3i with parent %3i", n1i, parent);
+        //printf("  bb: %f %f %f, %f %f %f\n", n1bb.a.x, n1bb.a.y, n1bb.a.z, n1bb.b.x, n1bb.b.y, n1bb.b.z);
+        CBVHRecurseSet(bvh, triangles, verts, list1.data(), list1.size(), nodes, n1i, axis_count, depthcounter + 1);
       }
 
       size_t n2i = nodes->size();
@@ -144,12 +185,16 @@ namespace
         node2.type = cbvhLEAF;
         CBVHCreateLeaf(bvh, triangles, verts, list2.data(), list2.size(), &node2);
         nodes->push_back(node2);
+        //printf("LEAF  node at index %3i with parent %3i", n2i, parent);
+        //printf("  bb: %f %f %f, %f %f %f\n", n2bb.a.x, n2bb.a.y, n2bb.a.z, n2bb.b.x, n2bb.b.y, n2bb.b.z);
       }
       else
       {
         node2.type = cbvhINNER;
         nodes->push_back(node2);
-        CBVHRecurseSet(bvh, triangles, verts, list2.data(), list2.size(), nodes, n2i, axis + 1, depthcounter + 1);
+        //printf("INNER node at index %3i with parent %3i", n2i, parent);
+        //printf("  bb: %f %f %f, %f %f %f\n", n2bb.a.x, n2bb.a.y, n2bb.a.z, n2bb.b.x, n2bb.b.y, n2bb.b.z);
+        CBVHRecurseSet(bvh, triangles, verts, list2.data(), list2.size(), nodes, n2i, axis_count, depthcounter + 1);
       }
     }
   }

@@ -98,6 +98,9 @@ float timer = 0;
 float cam_z = -3;
 double cam_r_x = 0;
 double cam_r_y = 0;
+vec3 cam_trans = { 0,0,-5 };
+fmat4x4 cam_matrix;
+CentroidBVH bvh;
 
 typedef cl_mem t_gltexfunc(cl_context,cl_mem_flags,cl_GLenum,cl_GLuint,cl_GLuint,cl_int *);
 
@@ -195,21 +198,14 @@ cl_mem clCreateFromGLTexture(   cl_context context,
   
   clerrchk(error);
   
-  float cammat[4][4] = {
-    1, 0, 0, 0,
-    0, 1, 0, 0,
-    0, 0, 1, 0,
-    0, 0, 0, 1
-  };
-  
-  cam_mat = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(float) * 16, cammat, &error);
+  cam_mat = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cam_matrix), cam_matrix, &error);
   clerrchk(error);
   
   printf("Loading model\n");
   std::vector<vec3> vertices;
   std::vector<uint3> indices;
 
-  LoadObj(std::ifstream("models/tri.obj"), vertices, indices);
+  LoadObj(std::ifstream("models/wheel.obj"), vertices, indices);
 
   tri_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(vec3) * vertices.size(), vertices.data(), &error);
   clerrchk(error);
@@ -217,7 +213,6 @@ cl_mem clCreateFromGLTexture(   cl_context context,
   clerrchk(error);
   printf("model loaded\n");
   printf("creating bvh\n");
-  CentroidBVH bvh;
   CentroidBVHInit(&bvh);
   CentroidBVHBuild(&bvh, indices.data(), vertices.data(), indices.size(), vertices.size());
   printf("bvh created\n");
@@ -356,13 +351,13 @@ void cl_update()
 {
   timer += 1;
   size_t gworksize[3] = {IMG_X, IMG_Y, 1};
-  size_t lworksize[3] = {8,4,1};
+  size_t lworksize[3] = {1,1,1};
   size_t offset[3] = {0,0,0};
   int error;
   float trans[4][4] = {
-    1, 0, 0, 0,
-    0, 1, 0, 0,
-    0, 0, 1, cam_z,
+    1, 0, 0, cam_trans.x,
+    0, 1, 0, cam_trans.y,
+    0, 0, 1, cam_trans.z,
     0, 0, 0, 1
   };
   float axisy[4]{ 0, 1, 0, 0 };
@@ -372,28 +367,146 @@ void cl_update()
   float matrix[4][4]{ 0 };
   rotate3(roty, axisy, cam_r_y / 50);
   rotate3(rotx, axisx, cam_r_x / 50);
-  multiply(trans, roty, matrix);
-  multiply(matrix, rotx, matrix);
-
+  multiply(trans, rotx, matrix);
+  multiply(matrix, roty, matrix);
+  glFinish();
   error = clEnqueueWriteBuffer(cmdQueue, cam_mat, false, 0, sizeof(float) * 16, matrix, 0, nullptr, nullptr);
   clerrchk(error);
   error = clEnqueueAcquireGLObjects(cmdQueue, 1, &gl_tex, 0, nullptr, nullptr);
   clerrchk(error);
-  error = clEnqueueNDRangeKernel(cmdQueue, kernel, 2, nullptr, gworksize, nullptr, 0, nullptr, nullptr);
+  error = clEnqueueNDRangeKernel(cmdQueue, kernel, 2, nullptr, gworksize, lworksize, 0, nullptr, nullptr);
   clerrchk(error);
   clEnqueueReleaseGLObjects(cmdQueue, 1, &gl_tex, 0, nullptr, nullptr);
   clerrchk(error);
   // sync point. is it needed?
-  clFinish(cmdQueue);
+}
+
+// broken still.....
+void draw_bvh_opengl()
+{
+  fmat4x4 cam_inv;
+  float f = 100;
+  float n = 0.0001;
+  float a = -(f + n) / (f - n);
+  float b = -2 * f * n / (f - n);
+  fmat4x4 projection = {
+    1, 0,  0, 0,
+    0, 1,  0, 0,
+    0, 0,  a, b,
+    0, 0, -1, 0
+  };
+
+  inverse(cam_matrix, cam_inv);
+
+  std::string vfile, ffile;
+  load_file("render_client/bvh_dbg.vs", vfile);
+  load_file("render_client/bvh_dbg.fs", ffile);
+  GLuint vert = glCreateShader(GL_VERTEX_SHADER);
+  GLuint frag = glCreateShader(GL_FRAGMENT_SHADER);
+  glerrchk();
+  const char *vstr = vfile.c_str();
+  const char *fstr = ffile.c_str();
+  int vsize = vfile.size();
+  int fsize = ffile.size();
+  glShaderSource(vert, 1, &vstr, &vsize);
+  glShaderSource(frag, 1, &fstr, &fsize);
+  glerrchk();
+  glCompileShader(vert);
+  glCompileShader(frag);
+
+  char cmplog[256];
+  GLsizei size;
+  glGetShaderInfoLog(vert, 255, &size, cmplog);
+  if (size)
+    printf("%s\n", cmplog);
+  glGetShaderInfoLog(frag, 255, &size, cmplog);
+  if (size)
+    printf("%s\n", cmplog);
+
+  GLuint program = glCreateProgram();
+  glAttachShader(program, vert);
+  glAttachShader(program, frag);
+  glLinkProgram(program);
+  glerrchk();
+
+  glUseProgram(program);
+  GLuint projection_uinf = glGetUniformLocation(program, "projection");
+  GLuint cam_unif = glGetUniformLocation(program, "cam_inv");
+  glerrchk();
+
+  glUniformMatrix4fv(projection_uinf, 1, false, projection[0]);
+  glerrchk();
+  glUniformMatrix4fv(cam_unif, 1, false, cam_inv[0]);
+  glerrchk();
+
+  GLuint buff[2];
+  glGenBuffers(2, buff);
+  //glDisable(GL_CULL_FACE);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buff[0]);
+  glerrchk();
+
+  unsigned indices[36] = {
+    0, 6, 4,
+    0, 2, 6,
+    0, 3, 2,
+    0, 1, 5,
+    2, 7, 6,
+    2, 3, 7,
+    4, 6, 7,
+    4, 7, 5,
+    0, 4, 5,
+    0, 5, 1,
+    1, 5, 7,
+    1, 7, 3
+  };
+
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_DYNAMIC_DRAW);
+  glerrchk();
+
+  for (unsigned i = 0; i < bvh.listSize; ++i)
+  {
+    AABB &bb = bvh.nodeList[i].aabb;
+    vec3 &a = bb.a;
+    vec3 &b = bb.b;
+    vec3 buffer[8] = {
+      a,
+      { a.x, a.y, b.z },
+      { a.x, b.y, a.z },
+      { a.x, b.y, b.z },
+      { b.x, a.y, a.z },
+      { b.x, a.y, b.z },
+      { b.x, b.y, a.z },
+      b
+    };
+
+    glBindBuffer(GL_ARRAY_BUFFER, buff[1]);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(CentroidBVHNode) * bvh.listSize, bvh.nodeList, GL_DYNAMIC_DRAW);
+    glerrchk();
+    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+    glerrchk();
+  }
+  glDeleteBuffers(2, buff);
+  glDeleteProgram(program);
+  glDeleteShader(vert);
+  glDeleteShader(frag);
+  glerrchk();
 }
 
 void gl_update()
 {
+  glDisable(GL_BLEND);
   glBindVertexArray(vao);
   glUseProgram(shader_prog);
   glDrawArrays(GL_TRIANGLES, 0, 6);
+  // bvh debug not working
+  //glEnable(GL_BLEND);
+  //glBlendFunc(GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA);
+  //draw_bvh_opengl();
+
+
+
   glfwSwapBuffers(window);
-  glFlush();
+  glFinish();
 }
 
 void cl_free()
@@ -479,6 +592,30 @@ int main(int argc, char *argv[])
     update();
     glfwPollEvents();
     glfwGetCursorPos(window, &cam_r_y, &cam_r_x);
+    if (glfwGetKey(window, GLFW_KEY_W))
+    {
+      cam_trans.y += 0.1;
+    }
+    if (glfwGetKey(window, GLFW_KEY_S))
+    {
+      cam_trans.y -= 0.1;
+    }
+    if (glfwGetKey(window, GLFW_KEY_A))
+    {
+      cam_trans.x -= 0.1;
+    }
+    if (glfwGetKey(window, GLFW_KEY_D))
+    {
+      cam_trans.x += 0.1;
+    }
+    if (glfwGetKey(window, GLFW_KEY_SPACE))
+    {
+      cam_trans.z += 0.1;
+    }
+    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT))
+    {
+      cam_trans.z -= 0.1;
+    }
     
     double t = glfwGetTime();
     char buff[32];

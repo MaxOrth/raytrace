@@ -26,15 +26,15 @@ void InitAABB(vec3 const *v, AABB *dest)
 
 void MinSizeAABB(AABB *dest)
 {
-  if (fabs(fabs(dest->a.x) - fabs(dest->b.x)) < 0.01)
+  if (dest->b.x - dest->a.x < 0.01)
   {
     dest->b.x += 0.01;
   }
-  if (fabs(fabs(dest->a.y) - fabs(dest->b.y)) < 0.01)
+  if (dest->b.y - dest->a.y < 0.01)
   {
     dest->b.y += 0.01;
   }
-  if (fabs(fabs(dest->a.z) - fabs(dest->b.z)) < 0.01)
+  if (dest->b.z - dest->a.z < 0.01)
   {
     dest->b.z += 0.01;
   }
@@ -42,6 +42,7 @@ void MinSizeAABB(AABB *dest)
 
 void RAYAPI GrowAABB(vec3 const *test, AABB *dest)
 {
+  //printf("Grow bb x. target: %3f bb:  %3f  %3f", test->x, dest->a.x, dest->b.x);
   dest->a.x = std::min(test->x, dest->a.x);
   dest->a.y = std::min(test->y, dest->a.y);
   dest->a.z = std::min(test->z, dest->a.z);
@@ -49,6 +50,7 @@ void RAYAPI GrowAABB(vec3 const *test, AABB *dest)
   dest->b.x = std::max(test->x, dest->b.x);
   dest->b.y = std::max(test->y, dest->b.y);
   dest->b.z = std::max(test->z, dest->b.z);
+  //printf("  end: %3f  %3f\n", dest->a.x, dest->b.x);
 }
 
 void RAYAPI GrowAABB(vec3 const *elems, size_t count, AABB *dest)
@@ -74,6 +76,7 @@ void GrowAABB(vec3 const *verts, uint3 const *tris, size_t const *which, size_t 
 {
   for (size_t i = 0; i < count; ++i)
   {
+    //printf("index: %i\n", which[i]);
     GrowAABB(verts + tris[which[i]].x, dest);
     GrowAABB(verts + tris[which[i]].y, dest);
     GrowAABB(verts + tris[which[i]].z, dest);
@@ -91,11 +94,11 @@ void Centroid(Tri const *t, vec3 *c)
 bool PointInAABB(vec3 const *p, AABB const *bb, float e)
 {
 
-  return
-    p->x - bb->a.x >= -e && p->x - bb->b.x <= e &&
-    p->y - bb->a.y >= -e && p->y - bb->b.y <= e &&
-    p->y - bb->a.z >= -e && p->z - bb->b.z <= e;
-
+  
+  bool a = p->x - bb->a.x > -e && p->x - bb->b.x < e; //&&
+  bool b = p->y - bb->a.y > -e && p->y - bb->b.y < e; //&&
+  bool c = p->z - bb->a.z > -e && p->z - bb->b.z < e;
+  return a && b && c;
   //return
   //  p->x >= bb->a.x && p->x <= bb->b.x &&
   //  p->y >= bb->a.y && p->y <= bb->b.y &&
