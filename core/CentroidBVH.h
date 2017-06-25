@@ -2,30 +2,29 @@
 
 #ifdef __OPENCL_VERSION__
 #include "core/raydata.h"
-#define cl_uint unsigned
-#define PACK_TIGHTLY __attribute__ ((aligned(1)))
 #else
 #include "raydata.h"
 #include <CL/cl.h>
-#define PACK_TIGHTLY
-#pragma pack(push, 1)
+// #pragma pack(push, 16) not working for some reason
 #endif
 
 #define TRIS_PER_LEAF 2
 
 struct CentroidBVHLeafNode
 {
-  cl_uint count;
   cl_uint tris[TRIS_PER_LEAF];
-} PACK_TIGHTLY;
+  cl_uint count;
+};
 #ifndef __cplusplus
 typedef struct CentroidBVHLeafNode CentroidBVHLeafNode;
 #endif
 
 struct CentroidBVHInnerNode
 {
+  cl_float4 plane_norm; // axis this children were seperated on.  Points tword children[0]
   cl_uint children_index[2];
-} PACK_TIGHTLY;
+  cl_uint padding[2]; // pack(16) should fix this but doesnt
+};
 #ifndef __cplusplus
 typedef struct CentroidBVHInnerNode CentroidBVHInnerNode;
 #endif
@@ -37,7 +36,7 @@ union CentroidBVHNodeUnion
 #ifdef __cplusplus
   CentroidBVHNodeUnion() {};
 #endif
-} PACK_TIGHTLY;
+};
 #ifndef __cplusplus
 typedef union CentroidBVHNodeUnion CentroidBVHNodeUnion;
 #endif
@@ -49,10 +48,12 @@ enum CentroidBVHNodeType
 
 struct CentroidBVHNode
 {
-  AABB aabb;
   union CentroidBVHNodeUnion node;
-  unsigned type;
-} PACK_TIGHTLY;
+  AABB aabb;
+  cl_uint type;
+  cl_uint parent_index;
+  cl_uint padding[2]; // pack(16) should fix this
+};
 #ifndef __cplusplus
 typedef struct CentroidBVHNode CentroidBVHNode;
 #endif
@@ -63,11 +64,11 @@ typedef struct CentroidBVHNode CentroidBVHNode;
 
 /*
   Root is the first node. nodeList[0].  
-  A CentroidBVH is build on top of a triangle list. If the triangle list 
-  changes or gets deleted then this bvh is useless.
+  A CentroidBVH is build by referencing a triangle list.
   It does this by using indices into the triangle list.
   This is so it is compatible with opencl.
 */
+#ifndef __OPENCL_VERSION__
 struct CentroidBVH
 {
   CentroidBVHNode *nodeList;
@@ -77,6 +78,7 @@ struct CentroidBVH
   int tricount;
   int leafcount;
 };
+#endif
 #ifndef __cplusplus
 typedef struct CentroidBVH CentroidBVH;
 #endif

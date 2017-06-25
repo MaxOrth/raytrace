@@ -1,42 +1,49 @@
 /*
   data primitives
 */
+#ifndef __OPENCL_VERSION__
+#include <CL/cl.h>
+#endif
 
 #define RAYAPI __stdcall
 
 #pragma once
 
 #ifdef __OPENCL_VERSION__ 
+//#define PACK_TIGHTLY __attribute__ ((aligned(1)))
+typedef float cl_float;
+typedef unsigned cl_uint;
 typedef float3 vec3;
-
+typedef float3 cl_float4;
 #define VEC3 vec3
 
 #else
+//#define PACK_TIGHTLY
 
 #define VEC3 struct vec3
 
 struct uint3
 {
-  unsigned x;
-  unsigned y;
-  unsigned z;
-  unsigned w;
+  cl_uint x;
+  cl_uint y;
+  cl_uint z;
+  cl_uint w; // same as vec3
 #ifdef __cplusplus
-  unsigned &operator[](int i) { return (&x)[i]; };
-  unsigned const &operator[](int i) const { return (&x)[i]; };
+  cl_uint &operator[](int i) { return (&x)[i]; };
+  cl_uint const &operator[](int i) const { return (&x)[i]; };
   uint3() : w(0) {};
 #endif
 };
 
 struct vec3
 {
-  float x;
-  float y;
-  float z;
-  float w; // lol. see OpenCL 6.1.5: Alignment of Types
+  cl_float x;
+  cl_float y;
+  cl_float z;
+  cl_float w; // lol. see OpenCL 6.1.5: Alignment of Types
 #ifdef __cplusplus
-  float &operator[](int i) { return (&x)[i]; };
-  float const &operator[](int i) const { return (&x)[i]; };
+  cl_float &operator[](int i) { return (&x)[i]; };
+  cl_float const &operator[](int i) const { return (&x)[i]; };
 #endif
 };
 
@@ -52,8 +59,8 @@ struct Ray
 
 struct vec2
 {
-  float u;
-  float v;
+  cl_float u;
+  cl_float v;
 };
 
 typedef VEC3 Tri[3];
@@ -74,18 +81,6 @@ struct AABB
 #ifndef __cplusplus
 typedef struct AABB AABB;
 #endif
-
-struct Model
-{
-  struct AABB vol;
-  unsigned triangles[3];
-};
-
-struct SceneObject
-{
-  VEC3 mat[3];
-  unsigned mi;  // index into model list
-};
 
 #define EPSILON (0.000001)
 

@@ -113,6 +113,20 @@ namespace
           }
 
         }
+         
+        if (axis_count % 3 == 0)
+        {
+          (*nodes)[parent].node.inner.plane_norm = { -1,0,0 };
+        }
+        if (axis_count % 3 == 1)
+        {
+          (*nodes)[parent].node.inner.plane_norm = { 0,-1,0 };
+        }
+        if (axis_count % 3 == 2)
+        {
+          (*nodes)[parent].node.inner.plane_norm = { 0,0,-1 };
+        }
+
         axis_count++;
       }
       delete[] centroids;
@@ -152,10 +166,13 @@ namespace
         }
       }
 
+      size_t parent = nodes->size() - 1;
+
       size_t n1i = nodes->size();
       CentroidBVHNode node1;
       (*nodes)[parent].node.inner.children_index[0] = n1i;
       node1.aabb = n1bb;
+      node1.parent_index = parent;
 
       if (list1.size() <= TRIS_PER_LEAF)
       {
@@ -179,6 +196,7 @@ namespace
       CentroidBVHNode node2;
       (*nodes)[parent].node.inner.children_index[1] = n2i;
       node2.aabb = n2bb;
+      node2.parent_index = parent;
 
       if (list2.size() <= TRIS_PER_LEAF)
       {
@@ -220,6 +238,7 @@ void CentroidBVHBuild(CentroidBVH *bvh, uint3 const *triangles, vec3 const *vert
   {
     initialSet[i] = i;
   }
+  root.parent_index = -1;
   nodeList.push_back(root);
   CBVHRecurseSet(bvh, triangles, verts, initialSet, tricount, &nodeList, 0, 0, 0);
   delete[] initialSet;

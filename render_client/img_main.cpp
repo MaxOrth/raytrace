@@ -31,8 +31,8 @@
 #include "CentroidBVH.h"
 #include "Affine.h"
 
-#define IMG_X 1920/2
-#define IMG_Y 1080/2
+#define IMG_X 800
+#define IMG_Y 600
 
 void glerrchk_impl(int line)
 {
@@ -95,10 +95,9 @@ int use_platform = 0;
 int use_device = 0;
 float timer = 0;
 
-float cam_z = -3;
 double cam_r_x = 0;
 double cam_r_y = 0;
-vec3 cam_trans = { 0,0,-5 };
+vec3 cam_trans = { 0.5,0.5,-10 };
 fmat4x4 cam_matrix;
 CentroidBVH bvh;
 
@@ -179,9 +178,15 @@ void cl_init(void)
   kernel = clCreateKernel(program[0], "trace", &error);
 
   cl_ulong kernel_mem_req;
-  clGetKernelWorkGroupInfo(kernel, deviceIdMasterList[use_platform][use_device], CL_KERNEL_LOCAL_MEM_SIZE, sizeof(cl_ulong), &kernel_mem_req, nullptr);
+  error = clGetKernelWorkGroupInfo(kernel, deviceIdMasterList[use_platform][use_device], CL_KERNEL_LOCAL_MEM_SIZE, sizeof(cl_ulong), &kernel_mem_req, nullptr);
   printf("Kernel requires %lld bytes\n", kernel_mem_req);
+
+  clerrchk(error);
   
+  size_t workGroupSize = 0;
+  error = clGetKernelWorkGroupInfo(kernel, deviceIdMasterList[use_platform][use_device], CL_KERNEL_WORK_GROUP_SIZE, sizeof(size_t), &workGroupSize, nullptr);
+  printf("Recommened work group size: %i\n", workGroupSize);
+
   clerrchk(error);
   
 /*
@@ -205,12 +210,16 @@ cl_mem clCreateFromGLTexture(   cl_context context,
   std::vector<vec3> vertices;
   std::vector<uint3> indices;
 
-  LoadObj(std::ifstream("models/wheel.obj"), vertices, indices);
+  LoadObj(std::ifstream("models/dragon.obj"), vertices, indices);
 
   tri_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(vec3) * vertices.size(), vertices.data(), &error);
   clerrchk(error);
   tri_ind_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(uint3) * indices.size(), indices.data(), &error);
   clerrchk(error);
+  printf("Node size: %i\n", sizeof(CentroidBVHNode));
+  printf("Union size: %i\n", sizeof(CentroidBVHNodeUnion));
+  printf("Leaf size: %i\n", sizeof(CentroidBVHLeafNode));
+  printf("Inner size: %i\n", sizeof(CentroidBVHInnerNode));
   printf("model loaded\n");
   printf("creating bvh\n");
   CentroidBVHInit(&bvh);
@@ -345,13 +354,14 @@ void gl_init()
   glUniform1i(texunif, 0);
   
   glerrchk();
+  glViewport(0, 0, IMG_X, IMG_Y);
 }
 
 void cl_update()
 {
   timer += 1;
   size_t gworksize[3] = {IMG_X, IMG_Y, 1};
-  size_t lworksize[3] = {1,1,1};
+  size_t lworksize[3] = {4,4,1};
   size_t offset[3] = {0,0,0};
   int error;
   float trans[4][4] = {
@@ -369,7 +379,6 @@ void cl_update()
   rotate3(rotx, axisx, cam_r_x / 50);
   multiply(trans, rotx, matrix);
   multiply(matrix, roty, matrix);
-  glFinish();
   error = clEnqueueWriteBuffer(cmdQueue, cam_mat, false, 0, sizeof(float) * 16, matrix, 0, nullptr, nullptr);
   clerrchk(error);
   error = clEnqueueAcquireGLObjects(cmdQueue, 1, &gl_tex, 0, nullptr, nullptr);
@@ -378,118 +387,7 @@ void cl_update()
   clerrchk(error);
   clEnqueueReleaseGLObjects(cmdQueue, 1, &gl_tex, 0, nullptr, nullptr);
   clerrchk(error);
-  // sync point. is it needed?
-}
-
-// broken still.....
-void draw_bvh_opengl()
-{
-  fmat4x4 cam_inv;
-  float f = 100;
-  float n = 0.0001;
-  float a = -(f + n) / (f - n);
-  float b = -2 * f * n / (f - n);
-  fmat4x4 projection = {
-    1, 0,  0, 0,
-    0, 1,  0, 0,
-    0, 0,  a, b,
-    0, 0, -1, 0
-  };
-
-  inverse(cam_matrix, cam_inv);
-
-  std::string vfile, ffile;
-  load_file("render_client/bvh_dbg.vs", vfile);
-  load_file("render_client/bvh_dbg.fs", ffile);
-  GLuint vert = glCreateShader(GL_VERTEX_SHADER);
-  GLuint frag = glCreateShader(GL_FRAGMENT_SHADER);
-  glerrchk();
-  const char *vstr = vfile.c_str();
-  const char *fstr = ffile.c_str();
-  int vsize = vfile.size();
-  int fsize = ffile.size();
-  glShaderSource(vert, 1, &vstr, &vsize);
-  glShaderSource(frag, 1, &fstr, &fsize);
-  glerrchk();
-  glCompileShader(vert);
-  glCompileShader(frag);
-
-  char cmplog[256];
-  GLsizei size;
-  glGetShaderInfoLog(vert, 255, &size, cmplog);
-  if (size)
-    printf("%s\n", cmplog);
-  glGetShaderInfoLog(frag, 255, &size, cmplog);
-  if (size)
-    printf("%s\n", cmplog);
-
-  GLuint program = glCreateProgram();
-  glAttachShader(program, vert);
-  glAttachShader(program, frag);
-  glLinkProgram(program);
-  glerrchk();
-
-  glUseProgram(program);
-  GLuint projection_uinf = glGetUniformLocation(program, "projection");
-  GLuint cam_unif = glGetUniformLocation(program, "cam_inv");
-  glerrchk();
-
-  glUniformMatrix4fv(projection_uinf, 1, false, projection[0]);
-  glerrchk();
-  glUniformMatrix4fv(cam_unif, 1, false, cam_inv[0]);
-  glerrchk();
-
-  GLuint buff[2];
-  glGenBuffers(2, buff);
-  //glDisable(GL_CULL_FACE);
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buff[0]);
-  glerrchk();
-
-  unsigned indices[36] = {
-    0, 6, 4,
-    0, 2, 6,
-    0, 3, 2,
-    0, 1, 5,
-    2, 7, 6,
-    2, 3, 7,
-    4, 6, 7,
-    4, 7, 5,
-    0, 4, 5,
-    0, 5, 1,
-    1, 5, 7,
-    1, 7, 3
-  };
-
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_DYNAMIC_DRAW);
-  glerrchk();
-
-  for (unsigned i = 0; i < bvh.listSize; ++i)
-  {
-    AABB &bb = bvh.nodeList[i].aabb;
-    vec3 &a = bb.a;
-    vec3 &b = bb.b;
-    vec3 buffer[8] = {
-      a,
-      { a.x, a.y, b.z },
-      { a.x, b.y, a.z },
-      { a.x, b.y, b.z },
-      { b.x, a.y, a.z },
-      { b.x, a.y, b.z },
-      { b.x, b.y, a.z },
-      b
-    };
-
-    glBindBuffer(GL_ARRAY_BUFFER, buff[1]);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(CentroidBVHNode) * bvh.listSize, bvh.nodeList, GL_DYNAMIC_DRAW);
-    glerrchk();
-    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-    glerrchk();
-  }
-  glDeleteBuffers(2, buff);
-  glDeleteProgram(program);
-  glDeleteShader(vert);
-  glDeleteShader(frag);
-  glerrchk();
+  clFinish(cmdQueue);
 }
 
 void gl_update()
@@ -498,15 +396,9 @@ void gl_update()
   glBindVertexArray(vao);
   glUseProgram(shader_prog);
   glDrawArrays(GL_TRIANGLES, 0, 6);
-  // bvh debug not working
-  //glEnable(GL_BLEND);
-  //glBlendFunc(GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA);
-  //draw_bvh_opengl();
-
-
+  glFinish();
 
   glfwSwapBuffers(window);
-  glFinish();
 }
 
 void cl_free()
@@ -549,8 +441,7 @@ void release()
 
 
 int main(int argc, char *argv[])
-{
-  if (!glfwInit())
+{  if (!glfwInit())
   {
     printf("glfw failed\n");
     return 0;
@@ -616,13 +507,12 @@ int main(int argc, char *argv[])
     {
       cam_trans.z -= 0.1;
     }
-    
     double t = glfwGetTime();
     char buff[32];
     sprintf(buff, "fps: %f", 1 / (t - time));
     time = t;
     glfwSetWindowTitle(window, buff);
-  }
+   }
   
   release();
   glfwTerminate();

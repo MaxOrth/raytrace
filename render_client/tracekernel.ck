@@ -1,4 +1,11 @@
 
+#ifndef __OPENCL_VERSION__
+#define __global __global
+#define __read_only __read_only
+#define __write_only __write_only
+#define __local __local
+#endif
+
 #include "core/raydata.h"
 #include "core/CentroidBVH.h"
 
@@ -79,6 +86,75 @@ int intersect_ray_aabb(AABB aabb, struct Ray ray, float *t)
 
 typedef float4(fmat4x4)[4];
 
+enum TraverseState
+{
+  tsFromParent,
+  tsFromSibling,
+  tsFromChild
+};
+
+unsigned near_child_impl(unsigned i, __global __read_only CentroidBVHNode *accel, struct Ray ray)
+{
+  // test is 1 if in same direction
+  unsigned test = dot(ray.dir, accel[i].node.inner.plane_norm) > 0;
+  return accel[i].node.inner.children_index[test];
+}
+
+//unsigned far_child_impl(unsigned i, __global __read_only CentroidBVHNode *accel, struct Ray ray)
+//{
+//  unsigned test = dot(ray.dir, accel[i].node.inner.plane_norm) <= 0;
+//  return accel[i].node.inner.children_index[test];
+//}
+
+unsigned parent_impl(unsigned i, __global __read_only CentroidBVHNode *accel)
+{
+  return accel[i].parent_index;
+}
+
+unsigned sibling_impl(unsigned i, __global __read_only CentroidBVHNode *accel)
+{
+  // if i is same index as 0th child, it becomes 1 which is the index of the other child
+  unsigned test = accel[accel[i].parent_index].node.inner.children_index[0] == i;
+  return accel[accel[i].parent_index].node.inner.children_index[test];
+}
+
+void ray_leaf_intersection(
+  CBVH_GPTR leaf, 
+  struct Ray ray, 
+  __global __read_only float3 *vert_buff, 
+  __global __read_only uint3 *ind_buff, 
+  struct vec2 *uvout, 
+  float *t_update,
+  unsigned *tri_ind_update
+)
+{
+  float t_tmp;
+  struct vec2 uv;
+  for (unsigned j = 0; j < leaf->node.leaf.count; ++j)
+  {
+    uint3 tri_index = ind_buff[leaf->node.leaf.tris[j]];
+    float3 a = vert_buff[tri_index.x];
+    float3 b = vert_buff[tri_index.y];
+    float3 c = vert_buff[tri_index.z];
+    //  VEC3 const a, VEC3 const b, VEC3 const c, struct Ray const r, struct vec2 *uvout, float *tout
+    if (
+      intersect_ray_triangle(
+        a,
+        b,
+        c,
+        ray,
+        &uv,
+        &t_tmp
+      ) // v1, v2, v3, ray, &uv, &t_tmp) 
+      && t_tmp < *t_update)
+    {
+      *t_update = t_tmp;
+      *uvout = uv;
+      *tri_ind_update = leaf->node.leaf.tris[j];
+    }
+  }
+}
+
 void mult_m_f4(fmat4x4 const *mat, float4 const *vec, float4 *out)
 {
   out->x = dot((*mat)[0], *vec);
@@ -96,6 +172,12 @@ __kernel void trace(
   __read_only __global CentroidBVHNode *accel
   )
 {
+  //printf("size of node: %i\n", sizeof(struct CentroidBVHNode));
+  //printf("Size of union: %i\n", sizeof(union CentroidBVHNodeUnion));
+  //printf("Leaf size: %i\n", sizeof(struct CentroidBVHLeafNode));
+  //printf("Inner size: %i\n", sizeof(struct CentroidBVHInnerNode));
+  //return;
+  
   int2 pix = { get_global_id(0), get_global_id(1) };
   int2 dim = get_image_dim(destimg);
   float2 dimf = convert_float2(dim);
@@ -130,101 +212,116 @@ __kernel void trace(
   __global float3 *vert_buff = (__global __read_only float3 *)vertices;
   __global uint3 *ind_buff = (__global __read_only uint3 *)indices;
 
-  //list of internal nodes with potential intersections
-  //__global __read_only CentroidBVHNode * __local nodeStack[8];
-  //__global __read_only CentroidBVHNode * __local leafNodeStack[3];
 
-  // only needs to be as big as deepest branch
-  CBVH_GPTR __local nodeStack[25];
-  // TODO do ray triangle intersection on leaf discovery to get rid of this stack.  
-  // this stack will overflow very easily.
-  CBVH_GPTR __local leafNodeStack[80];
+#define nearChild(i, r) (near_child_impl((i), accel, (r)))
+#define farChild(i, r) (far_child_impl((i), accel, (r)))
+#define parent(i) (parent_impl((i), accel))
+#define sibling(i) (sibling_impl((i), accel))
 
-  unsigned nodeStackSize = 1; // 1 bc we push root on at beginning
-  unsigned leafStackSize = 0;
-  
-  // push root onto stack
-  nodeStack[0] = accel;
+  unsigned curr_node = nearChild(0, ray);
+  enum TraverseState traverse_state = tsFromParent;
 
-  float t;
-  // find all leaf nodes with potential intersections
-  while (nodeStackSize)
-  {
-    // pop top of stack
-    CBVH_GPTR curr = nodeStack[nodeStackSize - 1];
-    nodeStackSize--;
-    
-    unsigned child1 = curr->node.inner.children_index[0];
-    if (intersect_ray_aabb(accel[child1].aabb, ray, &t))
-    {
-      if (accel[child1].type == cbvhINNER)
-      {
-        color.x += 0.1;
-        nodeStack[nodeStackSize] = accel + child1;
-        nodeStackSize++;
-      }
-      else
-      {
-        color.y += 0.2;
-        leafNodeStack[leafStackSize] = accel + child1;
-        leafStackSize++;
-      }
-    }
-  
-    unsigned child2 = curr->node.inner.children_index[1];
-    if (intersect_ray_aabb(accel[child2].aabb, ray, &t))
-    {
-      if (accel[child2].type == cbvhINNER)
-      {
-        color.x += 0.1;
-        nodeStack[nodeStackSize] = accel + child2;
-        nodeStackSize++;
-      }
-      else
-      {
-        color.y += 0.2;
-        leafNodeStack[leafStackSize] = accel + child2;
-        leafStackSize++;
-      }
-    }
-  }
-
+  // t for aabb intersection. not used yet
+  float t_quit_early;
 
   struct vec2 uv;
   float t_near = MAXFLOAT;
   float t_tmp = 0;
-  // intersect ray with leaf node contents
-  for (unsigned i = 0; i < leafStackSize; ++i)
+  unsigned intersected_triangle = -1;
+
+  bool go = true;
+  // stackless bvh traversal from https://graphics.cg.uni-saarland.de/2011/hapalasccg2011/
+  
+  do
   {
-    CBVH_GPTR curr = leafNodeStack[i];
-    //CentroidBVHNode curr = *(leafNodeStack);
-    for (unsigned j = 0; j < curr->node.leaf.count; ++j)
+    if (traverse_state == tsFromChild)
     {
-      uint3 tri_index = ind_buff[curr->node.leaf.tris[j]];
-      float3 a = vert_buff[tri_index.x];
-      float3 b = vert_buff[tri_index.y];
-      float3 c = vert_buff[tri_index.z];
-      float3 n = cross(a - b, a - c);
-      n = normalize(n);
-      float u = fabs((float)(dot(n, ray.dir)));
-      //  VEC3 const *a, VEC3 const *b, VEC3 const *c, struct Ray const *r, struct vec2 *uvout, float *tout
-      if (
-        intersect_ray_triangle(
-          a,
-          b,
-          c,
-          ray,
-          &uv,
-          &t_tmp
-        ) // v1, v2, v3, ray, &uv, &t_tmp) 
-          && t_tmp < t_near)
+      // root is index 0
+      if (curr_node == 0)
       {
-        color.x = 0.3 + u;
-        color.y = 0.3 + u;
-        color.z = 0.3 + u;
-        t_near = t_tmp;
+        go = false;
+      }
+      else if (curr_node == nearChild(parent(curr_node), ray))
+      {
+        curr_node = sibling(curr_node);
+        traverse_state = tsFromSibling;
+      }
+      else
+      {
+        curr_node = parent(curr_node);
+        traverse_state = tsFromChild;
       }
     }
+    else if (traverse_state == tsFromSibling)
+    {
+      if (!intersect_ray_aabb(accel[curr_node].aabb, ray, &t_quit_early))
+      {
+        curr_node = parent(curr_node);
+        traverse_state = tsFromChild;
+      }
+      else if (accel[curr_node].type == cbvhLEAF)
+      {
+        ray_leaf_intersection(
+          accel + curr_node,
+          ray,
+          vert_buff,
+          ind_buff,
+          &uv,
+          &t_near,
+          &intersected_triangle
+        );
+
+        curr_node = parent(curr_node);
+        traverse_state = tsFromChild;
+      }
+      else
+      {
+        curr_node = nearChild(curr_node, ray);
+        traverse_state = tsFromParent;
+      }
+    }
+    else if (traverse_state == tsFromParent)
+    {
+      if (!intersect_ray_aabb(accel[curr_node].aabb, ray, &t_quit_early))
+      {
+        curr_node = sibling(curr_node);
+        traverse_state = tsFromSibling;
+      }
+      else if (accel[curr_node].type == cbvhLEAF)
+      {
+        ray_leaf_intersection(
+          accel + curr_node,
+          ray,
+          vert_buff,
+          ind_buff,
+          &uv,
+          &t_near,
+          &intersected_triangle
+        );
+        curr_node = sibling(curr_node);
+        traverse_state = tsFromSibling;
+      }
+      else
+      {
+        curr_node = nearChild(curr_node, ray);
+        traverse_state = tsFromParent;
+      }
+    }
+  } while (go);
+  
+  // calculate final color
+  if (intersected_triangle != -1)
+  {
+    uint3 tri_ind = ind_buff[intersected_triangle];
+    float3 a = vert_buff[tri_ind.x];
+    float3 b = vert_buff[tri_ind.y];
+    float3 c = vert_buff[tri_ind.z];
+    float3 n = normalize(cross(a - c, a - b));
+    float u = 0.7 * dot(n, ray.dir);
+    color.x = 0.3 + u;
+    color.y = 0.3 + u;
+    color.z = 0.3 + u;
+    color.w = 1;
   }
 
   //// iterate through all tris (naive method)
@@ -237,16 +334,15 @@ __kernel void trace(
   //  float3 c = vert_buff[tri_ind.z];
   //  float3 n = cross(a - b, a - c);
   //  float u = fabs((float)(dot(n, ray.dir) * 0.7f));
-  //  if (intersect_ray_triangle(a, b, c, ray, &uv, &t) && t < t_near)
+  //  if (intersect_ray_triangle(a, b, c, ray, &uv, &t_tmp) && t_tmp < t_near)
   //  {
   //    //color.y = 0.1;
-  //    color.x = 0.3f + u;//1 - uv.u - uv.v;
-  //    color.y = 0.3f + u;//uv.u;
-  //    //color.z = 0.3f + u;//uv.v;
-  //    t_near = t;
+  //    color.x = 1;//u;//1 - uv.u - uv.v;
+  //    //color.y = 1;//u;//uv.u;
+  //    //color.z = 1;//u;//uv.v;
+  //    t_near = t_tmp;
   //  }
   //}
-
 
   write_imagef(destimg, pix, color);
 }
