@@ -23,6 +23,8 @@ void CentroidBVHFree(CentroidBVH *bvh)
   delete[] bvh->nodeList;
 }
 
+// TODO make leaf nodes have index and size into a 2nd list which contains triangle indices. Allows for leafs with variable triangle counts
+
 namespace
 {
 
@@ -48,23 +50,26 @@ namespace
     else
     {
       bvh->depth = std::max(bvh->depth, depthcounter);
-      // calculate barycenter of triangle set (just realized it might be bad but might actually turn out well in practice? 
-      //                                          teapot in stadium problem, or more like teapont in space)
-      vec3 centroid{ 0,0,0 };
-      float total_mass = 0;
+      
+      // calculate midpoint.  I try to do it a more stable way by adding little bits each time,
+      // instead of summing all the points and dividing.
+
+      vec3 split_pt{ 0,0,0 };
+      
+      //float total_mass = 0;
       vec3 tri_c;
-      float tri_m;
+      //float tri_m;
       vec3 *centroids = new vec3[setsize];
       for (size_t i = 0; i < setsize; ++i)
       {
-        Tri t{ verts[triangles[i].x], verts[triangles[i].y], verts[triangles[i].z] }; // unaddressable access here. bad obj parser?
+        Tri t{ verts[triangles[i].x], verts[triangles[i].y], verts[triangles[i].z] };
         Centroid(&t, &tri_c);
-        centroids[i] = tri_c; // TODO calculate centroids and areas all upfront
-        vec3 crossres;
-        CROSS(t[0] - t[1], t[0] - t[2], crossres);
-        tri_m = LENGTH(crossres) / 2.f;
-        centroid = (centroid * total_mass + tri_c * tri_m) * (1.f / (total_mass + tri_m));
-        total_mass += tri_m;
+        centroids[i] = tri_c; // TODO calculate centroids all upfront
+        //vec3 crossres;
+        //CROSS(t[0] - t[1], t[0] - t[2], crossres);
+        //tri_m = LENGTH(crossres) / 2.f;
+        split_pt = split_pt * (i / (i + 1.f)) + tri_c * (1.f / (i + 1.f));
+        //total_mass += tri_m;
       }
       // split space: seperate on centroid coordinate
       // create two new lists of triangles
@@ -79,7 +84,7 @@ namespace
         {
           if (axis_count % 3 == 0)
           {
-            if (centroids[i].x < centroid.x)
+            if (centroids[i].x < split_pt.x)
             {
               list1.push_back(set[i]);
             }
@@ -90,7 +95,7 @@ namespace
           }
           else if (axis_count % 3 == 1)
           {
-            if (centroids[i].y < centroid.y)
+            if (centroids[i].y < split_pt.y)
             {
               list1.push_back(set[i]);
             }
@@ -101,7 +106,7 @@ namespace
           }
           else
           {
-            if (centroids[i].z < centroid.z)
+            if (centroids[i].z < split_pt.z)
             {
               list1.push_back(set[i]);
             }

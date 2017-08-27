@@ -1,0 +1,25 @@
+newmtl GreenMatte
+color 0 1 0
+rough 1
+ind_ref 1
+
+
+newmtl RedMatte
+color 1 0 0
+rough 1
+ind_ref 1
+
+newmtl BlueMatte
+color 0 0 1
+rough 1
+ind_ref 1
+
+newmtl Mirror
+color 1 1 1
+rough 0
+ind_ref 1
+
+newmtl Glass
+color 0.1 0.1 0.3
+rough 0
+ind_ref 1.5

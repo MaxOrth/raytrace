@@ -1,22 +1,48 @@
 
 #include "ObjLoader.h"
+#include <fstream>
 #include <stdio.h>
 
 #define log(a) printf("%s\n", a)
 
-void LoadObj(std::istream &file, std::vector<vec3> &verts, std::vector<uint3> &indices)
+
+// TODO move to utilities
+namespace
+{
+  void splitstring(std::string const &str, char token, std::vector<std::string> &out)
+  {
+    std::vector<std::string> result;
+    size_t token_location = 0;
+    size_t substr_begin = 0;
+    while ((token_location = str.find(token, substr_begin)) != std::string::npos)
+    {
+      if (token_location != substr_begin)
+      {
+        result.push_back(str.substr(substr_begin, token_location - substr_begin));
+      }
+      substr_begin = token_location + 1;
+    }
+    if (substr_begin < str.size())
+    {
+      result.push_back(str.substr(substr_begin));
+    }
+    out = result;
+  }
+}
+
+void LoadObj(std::istream &file, std::vector<vec3> &verts, std::vector<uint3> &indices, MtlLib &mtllib, std::string folder)
 {
   if (!file)
   {
     printf("stream empty\n");
+    return;
   }
 
   std::vector<Tri> model;
-
   std::vector<vec3> vertices;
   std::vector<vec3> uvws;
   std::vector<uint3> faces;
-
+  int curr_mat_index = 0;
   /*
   Obj format. Lines starting with:
   v:  vertex coordinate
@@ -55,9 +81,9 @@ void LoadObj(std::istream &file, std::vector<vec3> &verts, std::vector<uint3> &i
         }
         else
         {
-          vert.x = atof(tokens[1].c_str());
-          vert.y = atof(tokens[2].c_str());
-          vert.z = atof(tokens[3].c_str());
+          vert.x = static_cast<float>(atof(tokens[1].c_str()));
+          vert.y = static_cast<float>(atof(tokens[2].c_str()));
+          vert.z = static_cast<float>(atof(tokens[3].c_str()));
           vert.w = 1;
         }
         vertices.push_back(vert);
@@ -77,10 +103,10 @@ void LoadObj(std::istream &file, std::vector<vec3> &verts, std::vector<uint3> &i
         }
         else
         {
-          texcoord.x = atof(tokens[1].c_str());
-          texcoord.y = atof(tokens[2].c_str());
+          texcoord.x = static_cast<float>(atof(tokens[1].c_str()));
+          texcoord.y = static_cast<float>(atof(tokens[2].c_str()));
           if (tokens.size() > 3)
-            texcoord.z = atof(tokens[3].c_str());
+            texcoord.z = static_cast<float>(atof(tokens[3].c_str()));
           texcoord.w = 0;
         }
         uvws.push_back(texcoord);
@@ -122,8 +148,10 @@ void LoadObj(std::istream &file, std::vector<vec3> &verts, std::vector<uint3> &i
             face[0] = static_cast<unsigned>(atoi(v1par[0].c_str())) - 1;
             face[1] = static_cast<unsigned>(atoi(v2par[0].c_str())) - 1;
             face[2] = static_cast<unsigned>(atoi(v3par[0].c_str())) - 1;
+            face[3] = curr_mat_index;
           }
 
+          // TODO use these texture indices
           if (v1par.size() > 1 && v2par.size() > 1 && v3par.size() > 1)
           {
             if (!v1par[1].empty() && !v2par[1].empty() && !v3par[1].empty())
@@ -134,7 +162,7 @@ void LoadObj(std::istream &file, std::vector<vec3> &verts, std::vector<uint3> &i
             }
           }
 
-          // vertex normals, not supported. will probably be using normal maps instead
+          // vertex normals. will probably be using normal maps instead
           //if (v1par.size() > 2 && v2par.size() > 2 && v3par.size() > 2)
           //{
           //  if (!v1par[2].empty() && !v2par[2].empty() && !v3par[2].empty())
@@ -147,6 +175,20 @@ void LoadObj(std::istream &file, std::vector<vec3> &verts, std::vector<uint3> &i
           faces.push_back(face);
         }
       }
+      else if (line_type == "mtllib")
+      {
+        std::vector<std::string> tokens;
+        splitstring(line, ' ', tokens);
+
+        LoadObjMaterials(std::ifstream(folder + tokens[1]), mtllib);
+      }
+      else if (line_type == "usemtl")
+      {
+        std::vector<std::string> tokens;
+        splitstring(line, ' ', tokens);
+
+        curr_mat_index = mtllib.MaterialIndex(tokens[1]);
+      }
       else
       {
         // unsuported record. ignoring
@@ -155,5 +197,131 @@ void LoadObj(std::istream &file, std::vector<vec3> &verts, std::vector<uint3> &i
   }
   verts = vertices;
   indices = faces;
+}
+
+void ResetMaterial(Material &mat)
+{
+  mat.color.s[0] = 0;
+  mat.color.s[1] = 0;
+  mat.color.s[2] = 0;
+  mat.color.s[3] = 0;
+
+  mat.uv.s[0] = 0;
+  mat.uv.s[1] = 0;
+  mat.uv.s[2] = 0;
+  mat.uv.s[3] = 0;
+
+
+  mat.Si = 1;
+  mat.Rf = 1;
+  mat.texId = 0;
+}
+
+void LoadObjMaterials(std::istream &file, MtlLib &matlib)
+{
+  if (!file)
+  {
+    return;
+  }
+
+  Material mat;
+  std::string name;
+
+  while (file)
+  {
+    std::string line;
+    std::getline(file, line);
+    std::string line_type = line.substr(0, line.find_first_of(' '));
+    if (line.size())
+    {
+      if (line_type == "newmtl")
+      {
+        if (!name.size())
+        {
+          ; // do nothing
+        }
+        else if (matlib.indices.find(name) != matlib.indices.end())
+        {
+          log("Material already defined, using previous definition");
+        }
+        else
+        {
+          matlib.InsertMaterial(name, mat);
+        }
+        ResetMaterial(mat);
+        std::vector<std::string> tokens;
+        splitstring(line, ' ', tokens);
+        name = tokens[1];
+      }
+      else if (line_type == "color")
+      {
+        std::vector<std::string> tokens;
+        splitstring(line, ' ', tokens);
+        mat.color.s[0] = static_cast<float>(atof(tokens[1].c_str()));
+        mat.color.s[1] = static_cast<float>(atof(tokens[2].c_str()));
+        mat.color.s[2] = static_cast<float>(atof(tokens[3].c_str()));
+      }
+      else if (line_type == "rough")
+      {
+        std::vector<std::string> tokens;
+        splitstring(line, ' ', tokens);
+        mat.Rf = static_cast<float>(atof(tokens[1].c_str()));
+      }
+      else if (line_type == "ind_ref")
+      {
+        std::vector<std::string> tokens;
+        splitstring(line, ' ', tokens);
+        mat.Si = static_cast<float>(atof(tokens[1].c_str()));
+      }
+
+      //else if (line_type == "Ka")
+      //{
+      //  // https://en.wikipedia.org/wiki/Specular_highlight#Beckmann_distribution
+      //  // ambient.  
+      //  // aparently reflectivity is partially exported through ambient in blender
+      //  // interpreted as intensity of the reflection, not roughness (% light that gets reflected by mirror vs refracted or absorbed and re-emitted
+      //
+      //}
+      //else if (line_type == "d")
+      //{
+      //  // "dissolved". oposite of transparency. d = 1 - tr
+      //}
+      //else if (line_type == "Tr")
+      //{
+      //  // transparency.
+      //}
+      //else if (line_type == "Kd")
+      //{
+      //  // diffuse
+      //  std::vector<std::string> tokens;
+      //  splitstring(line, ' ', tokens);
+      //  mat.color.s[0] = static_cast<float>(atof(tokens[1].c_str()));
+      //  mat.color.s[1] = static_cast<float>(atof(tokens[2].c_str()));
+      //  mat.color.s[2] = static_cast<float>(atof(tokens[3].c_str()));
+      //}
+      //else if (line_type == "Ks")
+      //{
+      //  // specular color
+      //}
+      //else if (line_type == "Ns")
+      //{
+      //  // specular power
+      //}
+      //else if (line_type == "Ni")
+      //{
+      //  // index of refraction
+      //  std::vector<std::string> tokens;
+      //  splitstring(line, ' ', tokens);
+      //  mat.N = static_cast<float>(atof(tokens[1].c_str()));
+      //}
+      
+
+
+
+    }
+
+  }
+
+
 }
 

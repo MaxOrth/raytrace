@@ -5,15 +5,18 @@
 #else
 #include "raydata.h"
 #include <CL/cl.h>
-// #pragma pack(push, 16) not working for some reason
+//#pragma pack(push, 16) // not working for some reason
 #endif
 
-#define TRIS_PER_LEAF 2
+#define TRIS_PER_LEAF (4)
 
 struct CentroidBVHLeafNode
 {
   cl_uint tris[TRIS_PER_LEAF];
   cl_uint count;
+  cl_uint padding_1;
+  cl_uint padding_2;
+  cl_uint padding_3;
 };
 #ifndef __cplusplus
 typedef struct CentroidBVHLeafNode CentroidBVHLeafNode;
@@ -21,7 +24,7 @@ typedef struct CentroidBVHLeafNode CentroidBVHLeafNode;
 
 struct CentroidBVHInnerNode
 {
-  cl_float4 plane_norm; // axis this children were seperated on.  Points tword children[0]
+  cl_float3 plane_norm; // axis this children were seperated on.  Points tword children[0]
   cl_uint children_index[2];
   cl_uint padding[2]; // pack(16) should fix this but doesnt
 };
@@ -59,7 +62,7 @@ typedef struct CentroidBVHNode CentroidBVHNode;
 #endif
 
 #ifndef __OPENCL_VERSION__
-#pragma pack(pop)
+//#pragma pack(pop)
 #endif
 
 /*

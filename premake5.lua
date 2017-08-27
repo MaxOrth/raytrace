@@ -24,7 +24,19 @@ elseif (nv_root ~= '' and nv_root ~= nil) then
   opencl_libdir = nv_root .. '\\lib\\x64'
   print('Found nvidia cuda sdk at: ' .. nv_root)
 else
-  print('Could not find an OpenCL sdk.  Renderer client project may not link.');
+  print('Could not find an OpenCL sdk.  Renderer client project may not link.')
+end
+
+
+
+-- If windows, find winsdk version
+local windsk_ver;
+if (os.is('windows')) then
+  local reg_query = 'reg query "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows Kits\\Installed Roots" /f * /k'
+  local req_query_output = io.popen(reg_query)
+  local keyname = req_query_output:read('*l')
+  winsdk_ver = string.gsub(keyname, '\\[^\]*]', '%1')
+  winsdk_ver = string.sub(winsdk_ver, 2, string.len(winsdk_ver))
 end
 
 
@@ -61,13 +73,17 @@ workspace 'raytracer'
   location 'build'
   startproject 'render_client'
   architecture 'x64'
-
+  
   
 project 'core'
   kind 'StaticLib'
   language 'C++'
   targetdir 'lib/%{cfg.buildcfg}'
   targetname 'raycore'
+  
+  configuration "vs*"
+    
+  configuration {}
   
   files { core_project .. '**.c', core_project .. '**.h', core_project .. '**.cpp', core_project .. '**.hpp' }
 

@@ -14,7 +14,9 @@
 typedef float cl_float;
 typedef unsigned cl_uint;
 typedef float3 vec3;
-typedef float3 cl_float4;
+typedef float4 cl_float4;
+typedef float3 cl_float3;
+typedef float2 cl_float2;
 #define VEC3 vec3
 
 #else
@@ -64,6 +66,19 @@ struct vec2
 };
 
 typedef VEC3 Tri[3];
+
+struct RayIntersection
+{
+  cl_float4 origin;
+  cl_float4 direction;
+  cl_float4 normal;
+  cl_float2 uv;
+  unsigned triangle_id;
+  unsigned p1;
+};
+#ifndef __cplusplus
+typedef struct RayIntersection RayIntersection;
+#endif
 
 /*
   a is "min", b is "max".
@@ -137,12 +152,14 @@ inline VEC3 operator*(float l, VEC3 const &r)
   return { r.x * l, r.y * l, r.z * l };
 }
 
-inline VEC3 mult(VEC3 const (&mat)[3], VEC3 const &v)
+inline VEC3 mult(float const (&mat)[4][4], VEC3 const &v)
 {
   VEC3 r;
   r.x = mat[0][0] * v[0] + mat[0][1] * v[1] + mat[0][2] * v[2];
   r.y = mat[1][0] * v[0] + mat[1][1] * v[1] + mat[1][2] * v[2];
   r.z = mat[2][0] * v[0] + mat[2][1] * v[1] + mat[2][2] * v[2];
+  r.z = mat[3][0] * v[0] + mat[3][1] * v[1] + mat[3][2] * v[2];
+  return r;
 }
 
 #endif
