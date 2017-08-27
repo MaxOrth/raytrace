@@ -13,6 +13,12 @@
 #include <CL/cl.h>
 #include <CL/cl_gl.h>
 #include "GL/glew.h"
+
+// cause I dont know how to get the gl context in linux
+#ifndef _WIN32
+#define GLFW_EXPOSE_NATIVE_GLX
+#define GLFW_EXPOSE_NATIVE_X11
+#endif
 #include "GLFW/glfw3.h"
 
 #include <Windows.h>
@@ -161,37 +167,24 @@ void cl_init(void)
   error = clGetDeviceInfo(deviceIdMasterList[use_platform][use_device], CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_uint), &computeCount, nullptr);
   printf("Selected device has %i \"compute units\"\n", computeCount);
   clerrchk(error);
-
-  // TODO win32 api calls
-  /*
-  ifdef OS_LNX
-        cl_context_properties cps[] = {
-            CL_GL_CONTEXT_KHR, (cl_context_properties)glfwGetGLXContext(window),
-            CL_GLX_DISPLAY_KHR, (cl_context_properties)glfwGetX11Display(),
-            CL_CONTEXT_PLATFORM, (cl_context_properties)lPlatform(),
-            0
-        };
-#endif
-#ifdef OS_WIN
-        cl_context_properties cps[] = {
-            CL_GL_CONTEXT_KHR, (cl_context_properties)glfwGetWGLContext(window),
-            CL_WGL_HDC_KHR, (cl_context_properties)GetDC(glfwGetWin32Window(window)),
-            CL_CONTEXT_PLATFORM, (cl_context_properties)lPlatform(),
-            0
-        };
-#endif
-  */
+#ifdef _WIN32
   HGLRC glcontext = wglGetCurrentContext();
   HDC devcontext = wglGetCurrentDC();
-  
-  const cl_context_properties contextProps[] =
-  {
-    CL_GL_CONTEXT_KHR, (cl_context_properties)(glcontext),
-    CL_WGL_HDC_KHR, (intptr_t)(devcontext),
-    CL_CONTEXT_PLATFORM, (intptr_t)(platformIds[use_platform]),
+  cl_context_properties contextProps[] = {
+    CL_GL_CONTEXT_KHR, (cl_context_properties)glcontext,
+    CL_WGL_HDC_KHR, (cl_context_properties)devcontext,
     0,
     0
   };
+#else
+  cl_context_properties contextProps[] = {
+    CL_GL_CONTEXT_KHR, (cl_context_properties)glfwGetGLXContext(window),
+    CL_GLX_DISPLAY_KHR, (cl_context_properties)glfwGetX11Display(),
+    0,
+    0
+  };
+#endif
+
   context = clCreateContext(contextProps, deviceIdMasterList[use_platform].size(), deviceIdMasterList[use_platform].data(), nullptr, nullptr, &error);
   clerrchk(error);
   
@@ -430,6 +423,7 @@ void gl_init()
   
   glerrchk();
   glViewport(0, 0, IMG_X, IMG_Y);
+  glClearColor(0, 0, 0, 1);
 }
 
 void cl_update()

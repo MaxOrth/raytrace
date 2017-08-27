@@ -93,8 +93,7 @@ int intersect_ray_aabb(AABB aabb, struct Ray ray, float *t)
 // project v onto p
 float4 proj(float4 v, float4 p)
 {
-  float4 p_h = normalize(p);
-  return dot(p_h, v) * p_h;
+  return (dot(v, p) / dot(p, p)) * p;
 }
 
 // reflect v over n
@@ -227,7 +226,7 @@ __kernel void trace(
   {
     // do we need to fudge the ray a bit away from the intersected triangle?
     // yes, we do
-    ray.dir = reflect(work_item->direction, work_item->normal).xyz;
+    ray.dir = -reflect(work_item->direction, work_item->normal).xyz;
     ray.origin.xyz = ray.origin.xyz + work_item->normal.xyz * 0.001f;
   }
   else if (trace_operation == 0)
@@ -375,7 +374,7 @@ __kernel void trace(
     float3 a = vert_buff[tri_ind.x];
     float3 b = vert_buff[tri_ind.y];
     float3 c = vert_buff[tri_ind.z];
-    float3 n = normalize(cross(a - c, a - b));
+    float3 n = normalize(cross(a - b, a - c));
 
     ray_out_item->origin.xyz = uv.u * vert_buff[tri_ind.x] + uv.v * vert_buff[tri_ind.y] + (1 - uv.u - uv.v) * vert_buff[tri_ind.z];
     ray_out_item->origin.w = 1;
@@ -393,6 +392,7 @@ __kernel void trace(
     color.xyz = u * mtl_lib[tri_ind.w].color;
     color.w = 1;  // fresnel calculation here for refraction and reflections
   }
+  
 
 
   write_imagef(color_img, pix, color);
