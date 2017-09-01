@@ -91,5 +91,5 @@ void CentroidBVHInit(CentroidBVH *bvh);
 void CentroidBVHFree(CentroidBVH *bvh);
 
 // make sure to delete the old one before you build a new one
-void CentroidBVHBuild(CentroidBVH *bvh, uint3 const *triangles, vec3 const *verts, size_t tricount, size_t vertcount);
+void CentroidBVHBuild(CentroidBVH *bvh, cl_uint8 const *triangles, vec3 const *verts, size_t tricount, size_t vertcount);
 #endif

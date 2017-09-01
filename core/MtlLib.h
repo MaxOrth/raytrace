@@ -19,6 +19,7 @@ struct Material
 #include <map>
 #include <vector>
 
+// Insert the material for the "sky" before you load anything
 struct MtlLib
 {
   std::map<std::string, int> indices;

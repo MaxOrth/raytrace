@@ -92,6 +92,7 @@ cl_mem tri_ind_buff;
 cl_mem accel_buff;
 cl_mem cam_buff;
 cl_mem mtl_buff;
+cl_mem normal_buff;
 cl_mem ray_isc_buff[2]; // need 2, one for reading and one for writing to. will read from 0 and write to 1
 cl_program program[2];
 GLuint texId[2];
@@ -108,7 +109,7 @@ int use_device = 0;
 
 double cam_r_x = 0;
 double cam_r_y = 0;
-vec3 cam_trans = { 0,0,-10 };
+vec3 cam_trans = { -0,0,-100 };
 
 fmat4x4 cam_matrix;
 CentroidBVH bvh;
@@ -233,16 +234,18 @@ cl_mem clCreateFromGLTexture(   cl_context context,
   
   printf("Loading model\n");
   std::vector<vec3> vertices;
-  std::vector<uint3> indices;
+  std::vector<cl_float4> normals;
+  std::vector<cl_uint8> indices;
   MtlLib mtllib;
-
-  LoadObj(std::ifstream("models/cube_mirror_test.obj"), vertices, indices, mtllib, "./models/");
+  mtllib.InsertMaterial("SKY_DEFAULT", { {0,0,0,0}, {0,0,0,0}, 0, 0, 0, 0 });
+  LoadObj(std::ifstream("models/cube_mirror_test.obj"), vertices, normals, indices, mtllib, "./models/");
 
   tri_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(vec3) * vertices.size(), vertices.data(), &error);
   clerrchk(error);
-  tri_ind_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(uint3) * indices.size(), indices.data(), &error);
+  tri_ind_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_uint8) * indices.size(), indices.data(), &error);
   clerrchk(error);
-
+  normal_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_float4) * normals.size(), normals.data(), &error);
+  clerrchk(error);
   mtl_buff = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(Material) * mtllib.materials.size(), mtllib.materials.data(), &error);
   clerrchk(error);
 
@@ -272,10 +275,10 @@ cl_mem clCreateFromGLTexture(   cl_context context,
   ray_isc_buff[1] = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_HOST_NO_ACCESS, sizeof(RayIntersection) * IMG_X * IMG_Y, nullptr, &error);
   clerrchk(error);
 
-  printf("Node size: %zi\n", sizeof(CentroidBVHNode));
-  printf("Union size: %zi\n", sizeof(CentroidBVHNodeUnion));
-  printf("Leaf size: %zi\n", sizeof(CentroidBVHLeafNode));
-  printf("Inner size: %zi\n", sizeof(CentroidBVHInnerNode));
+  //printf("Node size: %zi\n", sizeof(CentroidBVHNode));
+  //printf("Union size: %zi\n", sizeof(CentroidBVHNodeUnion));
+  //printf("Leaf size: %zi\n", sizeof(CentroidBVHLeafNode));
+  //printf("Inner size: %zi\n", sizeof(CentroidBVHInnerNode));
   printf("model loaded\n");
   printf("creating bvh\n");
   CentroidBVHInit(&bvh);
@@ -292,19 +295,19 @@ cl_mem clCreateFromGLTexture(   cl_context context,
 
   unsigned tricount = indices.size();
 
-  // TODO material library, rayintersection out buffers, reflection color plane drawing
-
   error = clSetKernelArg(kernel, 3, sizeof(unsigned), &tricount);
   clerrchk(error);
   error = clSetKernelArg(kernel, 4, sizeof(cl_mem), &tri_buff);
   clerrchk(error);
-  error = clSetKernelArg(kernel, 5, sizeof(cl_mem), &tri_ind_buff);
+  error = clSetKernelArg(kernel, 5, sizeof(cl_mem), &normal_buff);
   clerrchk(error);
-  error = clSetKernelArg(kernel, 6, sizeof(cl_mem), &cam_mat);
+  error = clSetKernelArg(kernel, 6, sizeof(cl_mem), &tri_ind_buff);
   clerrchk(error);
-  error = clSetKernelArg(kernel, 7, sizeof(cl_mem), &accel_buff);
+  error = clSetKernelArg(kernel, 7, sizeof(cl_mem), &cam_mat);
   clerrchk(error);
-  error = clSetKernelArg(kernel, 8, sizeof(cl_mem), &mtl_buff);
+  error = clSetKernelArg(kernel, 8, sizeof(cl_mem), &accel_buff);
+  clerrchk(error);
+  error = clSetKernelArg(kernel, 9, sizeof(cl_mem), &mtl_buff);
   clerrchk(error);
 
   cmdQueue = clCreateCommandQueue(context, deviceIdMasterList[use_platform][use_device], 0, &error);
@@ -424,6 +427,7 @@ void gl_init()
   glerrchk();
   glViewport(0, 0, IMG_X, IMG_Y);
   glClearColor(0, 0, 0, 1);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
 void cl_update()
@@ -436,14 +440,14 @@ void cl_update()
   error = clEnqueueAcquireGLObjects(cmdQueue, 2, gl_tex, 0, nullptr, nullptr);
   clerrchk(error);
 
-  clSetKernelArg(kernel, 0, sizeof(cl_mem), &gl_tex[0]);
+  error = clSetKernelArg(kernel, 0, sizeof(cl_mem), &gl_tex[0]);
   clerrchk(error);
-  clSetKernelArg(kernel, 1, sizeof(cl_mem), &cam_buff);
+  error = clSetKernelArg(kernel, 1, sizeof(cl_mem), &cam_buff);
   clerrchk(error);
-  clSetKernelArg(kernel, 2, sizeof(cl_mem), &ray_isc_buff[0]);
+  error = clSetKernelArg(kernel, 2, sizeof(cl_mem), &ray_isc_buff[0]);
   clerrchk(error);
   unsigned top = 0;
-  clSetKernelArg(kernel, 9, sizeof(unsigned), &top);
+  error = clSetKernelArg(kernel, 10, sizeof(unsigned), &top);
   clerrchk(error);
 
   size_t lworksize[3] = { 8,8,1 };
@@ -469,16 +473,18 @@ void cl_update()
   //  clerrchk(error);
   //}
   
-  
+  error = clFinish(cmdQueue);
+
+  clerrchk(error);
   // reflection test
-  clSetKernelArg(kernel, 0, sizeof(cl_mem), &gl_tex[1]);
+  error = clSetKernelArg(kernel, 0, sizeof(cl_mem), &gl_tex[1]);
   clerrchk(error);
-  clSetKernelArg(kernel, 1, sizeof(cl_mem), &ray_isc_buff[0]);
+  error = clSetKernelArg(kernel, 1, sizeof(cl_mem), &ray_isc_buff[0]);
   clerrchk(error);
-  clSetKernelArg(kernel, 2, sizeof(cl_mem), &ray_isc_buff[1]);
+  error = clSetKernelArg(kernel, 2, sizeof(cl_mem), &ray_isc_buff[1]);
   clerrchk(error);
   top = 1;
-  clSetKernelArg(kernel, 9, sizeof(unsigned), &top);
+  error = clSetKernelArg(kernel, 10, sizeof(unsigned), &top);
   clerrchk(error);
 
   {
@@ -498,13 +504,23 @@ void cl_update()
 
 void gl_update()
 {
+  glClear(GL_COLOR_BUFFER_BIT);
   glDisable(GL_BLEND);
   glBindVertexArray(vao);
   glUseProgram(shader_prog);
-  glBindTexture(GL_TEXTURE_2D, texId[tex_curr_draw]);
+
+  glBindTexture(GL_TEXTURE_2D, texId[0]);
   glActiveTexture(GL_TEXTURE0);
   glerrchk();
   glDrawArrays(GL_TRIANGLES, 0, 6);
+
+  glEnable(GL_BLEND);
+
+  glBindTexture(GL_TEXTURE_2D, texId[1]);
+  glActiveTexture(GL_TEXTURE0);
+  glerrchk();
+  glDrawArrays(GL_TRIANGLES, 0, 6);
+
   glFinish();
 
   glfwSwapBuffers(window);

@@ -25,7 +25,7 @@ void RAYAPI GrowAABB(vec3 const *elems, size_t count, AABB *dest);
 */
 void RAYAPI GrowAABB(Tri const *triangles, size_t tricount, AABB *aabb);
 
-void RAYAPI GrowAABB(vec3 const *verts, uint3 const *tris, size_t const *which, size_t count, AABB *aabb);
+void RAYAPI GrowAABB(vec3 const *verts, cl_uint8 const *tris, size_t const *which, size_t count, AABB *aabb);
 
 /*
   Calculate centroid of triangle

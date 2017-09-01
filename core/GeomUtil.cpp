@@ -72,7 +72,7 @@ void GrowAABB(Tri const *triangles, size_t tricount, AABB *aabb)
   }
 }
 
-void GrowAABB(vec3 const *verts, uint3 const *tris, size_t const *which, size_t count, AABB *dest)
+void GrowAABB(vec3 const *verts, cl_uint8 const *tris, size_t const *which, size_t count, AABB *dest)
 {
   for (size_t i = 0; i < count; ++i)
   {

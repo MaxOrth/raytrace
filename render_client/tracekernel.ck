@@ -1,11 +1,11 @@
 
 #ifndef __OPENCL_VERSION__
-#define __kernel __kernel
-#define __global __global
-#define __read_only __read_only
-#define __write_only __write_only
-#define __local __local
-#define __constant __constant
+#define __kernel 
+#define __global 
+#define __read_only 
+#define __write_only 
+#define __local 
+#define __constant 
 #endif
 
 #define COLOR_INCR 0.0001
@@ -15,9 +15,10 @@
 #include "core/MtlLib.h"
 #include "core/CentroidBVH.h"
 
-typedef __global CentroidBVHNode *CBVH_GPTR;
+typedef CentroidBVHNode __constant *CBVH_GPTR;
 
 // #include "raytri.h"
+// uv coordinate detail: (1-u-v)*a + u*b + u*c
 int intersect_ray_triangle(VEC3 a, VEC3 b, VEC3 c, struct Ray r, struct vec2 *uvout, float *tout)
 {
   VEC3 e1;
@@ -99,7 +100,7 @@ float4 proj(float4 v, float4 p)
 // reflect v over n
 float4 reflect(float4 v, float4 n)
 {
-  return 2 * proj(v, n) - v;
+  return v - 2.0f * dot(v,n) * n;
 }
 
 typedef float4(fmat4x4)[4];
@@ -111,7 +112,7 @@ enum TraverseState
   tsFromChild
 };
 
-unsigned near_child_impl(unsigned i, __global CentroidBVHNode *accel, struct Ray ray)
+unsigned near_child_impl(unsigned i, CentroidBVHNode __constant *accel, struct Ray ray)
 {
   // test is 1 if in same direction
   unsigned test = dot(ray.dir, accel[i].node.inner.plane_norm) > 0;
@@ -124,12 +125,12 @@ unsigned near_child_impl(unsigned i, __global CentroidBVHNode *accel, struct Ray
 //  return accel[i].node.inner.children_index[test];
 //}
 
-unsigned parent_impl(unsigned i, __global CentroidBVHNode *accel)
+unsigned parent_impl(unsigned i, CentroidBVHNode __constant *accel)
 {
   return accel[i].parent_index;
 }
 
-unsigned sibling_impl(unsigned i, __global CentroidBVHNode *accel)
+unsigned sibling_impl(unsigned i, CentroidBVHNode __constant *accel)
 {
   // if i is same index as 0th child, it becomes 1 which is the index of the other child
   unsigned test = accel[accel[i].parent_index].node.inner.children_index[0] == i;
@@ -144,8 +145,8 @@ unsigned sibling_impl(unsigned i, __global CentroidBVHNode *accel)
 void ray_leaf_intersection(
   CBVH_GPTR leaf, 
   struct Ray ray, 
-  __global float3 *vert_buff, 
-  __global uint4 *ind_buff, 
+  float3 __constant *vert_buff, 
+  uint8 __constant *ind_buff, 
   struct vec2 *uvout, 
   float *t_update,
   unsigned *tri_ind_update
@@ -155,7 +156,7 @@ void ray_leaf_intersection(
   struct vec2 uv;
   for (unsigned j = 0; j < leaf->node.leaf.count; ++j)
   {
-    uint3 tri_index = ind_buff[leaf->node.leaf.tris[j]].xyz;
+    uint3 tri_index = ind_buff[leaf->node.leaf.tris[j]].s012;
     float3 a = vert_buff[tri_index.x];
     float3 b = vert_buff[tri_index.y];
     float3 c = vert_buff[tri_index.z];
@@ -193,11 +194,12 @@ __kernel void trace(
 
   __constant RayIntersection *ray_in,
 
-  RayIntersection *ray_out,
+  __global RayIntersection *ray_out,
 
   const unsigned tricount,
   __constant float *vertices,
-  __constant unsigned *indices,
+  __constant float4 *normals,
+  __constant uint8 *indices,
   __constant float4 *cam_mat,
   __constant CentroidBVHNode *accel,
   __constant Material *mtl_lib,
@@ -205,7 +207,7 @@ __kernel void trace(
 )
 {
   __constant float3 *vert_buff = (__constant float3 *)vertices;
-  __constant uint4 *ind_buff = (__constant uint4 *)indices;
+  __constant uint8 *ind_buff = indices;
 
   struct Ray ray;
   unsigned gworkid_x = get_global_id(0);
@@ -215,9 +217,9 @@ __kernel void trace(
   pix.x = get_global_id(0);
   pix.y = get_global_id(1);
 
-  RayIntersection const * const work_item = ray_in + ray_in_buffer_index;
-  RayIntersection * const ray_out_item = ray_out + ray_in_buffer_index;
-  Material *tri_material = mtl_lib + ind_buff[work_item->triangle_id].w;
+  RayIntersection __constant * const work_item = ray_in + ray_in_buffer_index;
+  RayIntersection __global * const ray_out_item = ray_out + ray_in_buffer_index;
+  Material __constant *tri_material = mtl_lib + ind_buff[work_item->triangle_id].s3;
 
   ray.origin = work_item->origin.xyz;
 
@@ -226,8 +228,8 @@ __kernel void trace(
   {
     // do we need to fudge the ray a bit away from the intersected triangle?
     // yes, we do
-    ray.dir = -reflect(work_item->direction, work_item->normal).xyz;
-    ray.origin.xyz = ray.origin.xyz + work_item->normal.xyz * 0.001f;
+    ray.dir = reflect(work_item->direction, work_item->normal).xyz;
+    ray.origin = ray.origin + work_item->normal.xyz * 0.00001f;
   }
   else if (trace_operation == 0)
   {
@@ -242,10 +244,10 @@ __kernel void trace(
   //  float sn = tri_material.Si;
   //}
 
-  float4 color = { 0,0,0,1 };
+  float4 color = { 0,0,0,0 };
 
 
- 
+  // if using direction, apply camera matrix
   if (trace_operation == 0)
   {
     float4 out;
@@ -370,16 +372,13 @@ __kernel void trace(
   // calculate final color and output vectors
   if (intersected_triangle != ~0)
   {
-    uint4 tri_ind = ind_buff[intersected_triangle];
-    float3 a = vert_buff[tri_ind.x];
-    float3 b = vert_buff[tri_ind.y];
-    float3 c = vert_buff[tri_ind.z];
-    float3 n = normalize(cross(a - b, a - c));
+    uint8 tri_ind = ind_buff[intersected_triangle];
+    float4 n = uv.u * normals[tri_ind.s4] + uv.v * normals[tri_ind.s5] + (1 - uv.u - uv.v) * normals[tri_ind.s6];
 
-    ray_out_item->origin.xyz = uv.u * vert_buff[tri_ind.x] + uv.v * vert_buff[tri_ind.y] + (1 - uv.u - uv.v) * vert_buff[tri_ind.z];
+    ray_out_item->origin.xyz = (1 - uv.u - uv.v) * vert_buff[tri_ind.s0] + uv.u * vert_buff[tri_ind.s1] + uv.v * vert_buff[tri_ind.s2];
     ray_out_item->origin.w = 1;
 
-    ray_out_item->normal.xyz = n;
+    ray_out_item->normal = n;
     ray_out_item->normal.w = 0;
 
     ray_out_item->direction.xyz = ray.dir;
@@ -388,9 +387,14 @@ __kernel void trace(
     ray_out_item->uv.x = uv.u;
     ray_out_item->uv.y = uv.v;
 
-    float u = fabs(dot(n, ray.dir));
-    color.xyz = u * mtl_lib[tri_ind.w].color;
-    color.w = 1;  // fresnel calculation here for refraction and reflections
+    float u = fabs(dot(n.xyz, ray.dir));
+    color.xyz = u * mtl_lib[tri_ind.s3].color;
+
+    
+    color.w = mtl_lib[tri_ind.s3].Rf;  // fresnel calculation here for refraction and reflections
+    
+    //color.xyz = (1 + n.xyz) * 0.5f;
+    //color.w = 1;
   }
   
 

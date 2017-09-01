@@ -1,14 +1,19 @@
 newmtl Blue
 color 0 0 1
+rough 0
 
 newmtl Glass
-color 0.1 0.1 0.3
+color 0.1 0.1 0.7
+rough 0.3
 
 newmtl Green
 color 0 1 0
+rough 0
 
 newmtl Mirror
 color 1 1 1
+rough 1
 
 newmtl Red
 color 1 0 0
+rough 0

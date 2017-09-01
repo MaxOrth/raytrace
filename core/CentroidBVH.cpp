@@ -28,7 +28,7 @@ void CentroidBVHFree(CentroidBVH *bvh)
 namespace
 {
 
-  void CBVHCreateLeaf(CentroidBVH *bvh, uint3 const *triangles, vec3 const *verts, size_t const *set, size_t setsize, CentroidBVHNode *node)
+  void CBVHCreateLeaf(CentroidBVH *bvh, cl_uint8 const *triangles, vec3 const *verts, size_t const *set, size_t setsize, CentroidBVHNode *node)
   {
     bvh->leafcount++;
     //InitAABB(&verts[triangles[set[0]].x], &node->aabb);
@@ -41,7 +41,7 @@ namespace
     //printf("leaf bb: %f %f %f, %f %f %f\n", node->aabb.a.x, node->aabb.a.y, node->aabb.a.z, node->aabb.b.x, node->aabb.b.y, node->aabb.b.z);
   }
 
-  void CBVHRecurseSet(CentroidBVH *bvh, uint3 const *triangles, vec3 const *verts, size_t const *set, size_t setsize, std::vector<CentroidBVHNode> *nodes, size_t parent, unsigned axis, int depthcounter)
+  void CBVHRecurseSet(CentroidBVH *bvh, cl_uint8 const *triangles, vec3 const *verts, size_t const *set, size_t setsize, std::vector<CentroidBVHNode> *nodes, size_t parent, unsigned axis, int depthcounter)
   {
     if (setsize <= TRIS_PER_LEAF)
     {
@@ -223,7 +223,7 @@ namespace
   }
 }
 
-void CentroidBVHBuild(CentroidBVH *bvh, uint3 const *triangles, vec3 const *verts, size_t tricount, size_t vertcount)
+void CentroidBVHBuild(CentroidBVH *bvh, cl_uint8 const *triangles, vec3 const *verts, size_t tricount, size_t vertcount)
 {
   if (tricount == 0)
     return;
