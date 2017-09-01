@@ -343,9 +343,13 @@ void LoadObjMaterials(std::istream &file, MtlLib &matlib)
 
 
     }
-
   }
 
+  if (name.size())
+  {
+    matlib.InsertMaterial(name, mat);
+    name = "";
+  }
 
 }
 

@@ -427,7 +427,7 @@ void gl_init()
   glerrchk();
   glViewport(0, 0, IMG_X, IMG_Y);
   glClearColor(0, 0, 0, 1);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA);
 }
 
 void cl_update()
