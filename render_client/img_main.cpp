@@ -37,8 +37,8 @@
 #include "CentroidBVH.h"
 #include "Affine.h"
 
-#define IMG_X 512
-#define IMG_Y 512
+#define IMG_X (8*70)
+#define IMG_Y (8*70)
 
 void glerrchk_impl(int line)
 {
@@ -325,16 +325,20 @@ void gl_init()
 
   glCreateTextures(GL_TEXTURE_2D, 2, texId);
   glBindTexture(GL_TEXTURE_2D, texId[0]);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glerrchk();
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glerrchk();
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   glerrchk();
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, IMG_X, IMG_Y, 0, GL_RGBA, GL_FLOAT, zero);
 
   glBindTexture(GL_TEXTURE_2D, texId[1]);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glerrchk();
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glerrchk();
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   glerrchk();

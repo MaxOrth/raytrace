@@ -381,6 +381,17 @@ __kernel void trace(
     ray_out_item->normal = n;
     ray_out_item->normal.w = 0;
 
+    // refraction turning into a bitch
+    //if (dot(ray.dir, n.xyz) < 0) // entering volume
+    //{
+    //  float sn_old = mtl_lib[ind_buff[work_item->triangle_id].s3].Sn;
+    //}
+    //else // leaving volume
+    //{
+    //  
+    //}
+    
+
     ray_out_item->direction.xyz = ray.dir;
     ray_out_item->direction.w = 0;
 
